@@ -6,21 +6,17 @@ import type { Character, CharacterRecord } from '../rules/model';
 import { newCharacter, characterSchema } from '../rules/model';
 import { RULESET } from '../content/catalog';
 import { config } from './config';
+import { DomainError } from './errors';
+import { EquipmentRepository } from './equipment';
+export { DomainError } from './errors';
 
 export type User = { id: string; discordId: string; name: string; enabled: number };
 export type SessionUser = User & { guildId: string };
 export type PortraitImage = { data: Uint8Array; width: number; height: number };
-export class DomainError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
 const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 export class Repository {
   readonly db: DatabaseSync;
+  readonly equipment: EquipmentRepository;
   constructor(filename: string) {
     if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(filename);
@@ -55,6 +51,7 @@ export class Repository {
     this.db
       .prepare('INSERT OR IGNORE INTO ruleset_releases VALUES(?,?)')
       .run(RULESET, 'SW PL 2015; Exilium; 400 dollars; current-rank advancement');
+    this.equipment = new EquipmentRepository(this.db);
   }
   user(discordId: string, name: string): User {
     this.db

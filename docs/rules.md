@@ -25,7 +25,7 @@ The [catalog title audit](catalog-audit.md) accounts for all 111 Edge and 48 Hin
 | 29–48                  | Edge names, prerequisites, professional consent and legendary trait targeting                                  |
 | 42–43                  | Rank thresholds, advancement choices and Legendary rate/frequency                                              |
 | 49–50                  | Equipment notation and carrying capacity                                                                       |
-| 55–60                  | Manual equipment fields and reviewed equipment-picker examples                                                 |
+| 55–62                  | Manual equipment fields and the reviewed initial compendium                                                    |
 | 68–75                  | Fuksy, Shaken and wounds; tracker only, no automatic damage resolution                                         |
 
 Some source tables are less detailed than the full entry. The full entry takes precedence: for example, `Złota rączka` requires Niesamowita nauka and is therefore excluded, even though its summary appears mundane. `Pomysłowy Dobromir`, supernatural backgrounds, powers and magical racial options are excluded. `Niedowiarek`, `Szósty zmysł` and `Władca zwierząt` are not offered as automatic Exilium options pending an explicit mundane adaptation.
@@ -56,3 +56,5 @@ The rulebook does not identify weight units clearly in the extracted equipment s
 - Confirm imported historical advancement details rather than granting their old XP again.
 - Decide setting-specific prices/availability where the core catalog is unsuitable.
 - Record any agreed adaptation as an explicit ruling or a new ruleset version. Existing characters remain pinned to this version.
+
+The [equipment compendium](compendium.md) is shared editable campaign data. Its 117 initial values are seeded once; subsequent player edits are recorded separately from application releases. Inventory copies retain their selected values. Custom Knowledge rename/removal preserves dice, recalculates costs and updates or clears targeted Edge references.

@@ -80,6 +80,10 @@ test('create, track, level up, persist, print and export a Polish character', as
   await print.goto(`/characters/${id}/print`);
   await expect(print.locator('.print-sheet h1')).toHaveText('Łucja Żelazna');
   await expect(print.locator('.print-sheet')).toContainText('Rewolwer z Jericho');
+  await print.setViewportSize({ width: 820, height: 1180 });
+  await expect(print.locator('.compact-navigation')).toBeVisible();
+  await print.emulateMedia({ media: 'print' });
+  await expect(print.locator('.compact-navigation')).toBeHidden();
   await print.close();
   await page.getByRole('button', { name: 'Karta postaci', exact: true }).click();
   await page.screenshot({ path: 'test-results/exilium-desktop.png', fullPage: true });

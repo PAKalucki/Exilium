@@ -16,7 +16,9 @@
     ></a
   >
   <nav aria-label="Główne">
-    <a href="/">Postacie</a><span class="edition">SAVAGE WORLDS <b>2015</b></span>
+    <a href="/">Postacie</a>{#if data.user}<a href="/compendium">Kompendium</a>{/if}<span
+      class="edition">SAVAGE WORLDS <b>2015</b></span
+    >
   </nav>
   <div class="account">
     {#if data.user}<span class="online-dot"></span><span>{data.user.name}</span>
@@ -25,6 +27,9 @@
       </form>{:else}<span class="edition">MORZE POPIOŁU / EXILIUM</span>{/if}
   </div>
 </header>
+{#if data.user}<nav class="compact-navigation" aria-label="Sekcje aplikacji">
+    <a href="/">Postacie</a><a href="/compendium">Kompendium</a>
+  </nav>{/if}
 <main>{@render children()}</main>
 <footer class="site-footer">
   <span>EXILIUM <span aria-hidden="true">/</span> ZAPISZ SWOJĄ HISTORIĘ</span><span

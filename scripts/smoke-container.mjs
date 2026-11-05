@@ -133,6 +133,24 @@ try {
     ) === '401',
     'Portrait endpoint did not require authentication',
   );
+  node(`
+    import {DatabaseSync} from 'node:sqlite';import {createHash,randomUUID} from 'node:crypto';
+    const db=new DatabaseSync('/data/exilium.sqlite');
+    db.prepare('INSERT INTO auth_sessions(token_hash,user_id,expires_at,guild_id) VALUES(?,?,?,?)').run(createHash('sha256').update('catalog-smoke').digest('hex'),'smoke-user',Date.now()+300000,'200000000000000001');db.close();
+    const root='http://127.0.0.1:3000/api/compendium';
+    if((await fetch(root)).status!==401)throw Error('Anonymous compendium access allowed');
+    const headers={Origin:'https://exilium.test','Content-Type':'application/json',Cookie:'exilium_session=catalog-smoke'};
+    const entries=await (await fetch(root,{headers})).json();
+    if(entries.length!==117)throw Error('Compendium bootstrap incomplete');
+    const entry=entries.find(e=>e.document.item.name==='Glock (9mm)');
+    const body={revision:entry.revision,commandId:randomUUID(),command:{type:'update',document:{...entry.document,item:{...entry.document.item,price:321}}}};
+    const changed=await fetch(root+'/'+entry.id,{method:'POST',headers,body:JSON.stringify(body)});
+    if(changed.status!==200)throw Error('Runtime compendium editing failed');
+    const retry=await fetch(root+'/'+entry.id,{method:'POST',headers,body:JSON.stringify(body)});
+    if(retry.status!==200||(await retry.json()).revision!==2)throw Error('Catalog retry was not deduplicated');
+    const blocked=await fetch(root+'/'+entry.id,{method:'POST',headers:{...headers,Origin:'https://untrusted.invalid'},body:JSON.stringify(body)});
+    if(blocked.status!==403)throw Error('Cross-origin catalog write accepted');
+  `);
   node(
     "import {PNG} from 'pngjs';import jpeg from 'jpeg-js';import {imageSize} from 'image-size';const p=new PNG({width:2,height:3});p.data.fill(255);const decoded=PNG.sync.read(PNG.sync.write(p));const encoded=jpeg.encode(decoded,82).data;if(imageSize(encoded).height!==3||jpeg.decode(encoded).width!==2)throw Error('Portrait codecs unavailable')",
   );
@@ -167,6 +185,16 @@ try {
     }
   }
   assert(ready, 'Container did not recover after restart');
+  node(`
+    import {DatabaseSync} from 'node:sqlite';import {restore} from './scripts/restore.mjs';
+    const db=new DatabaseSync('/data/exilium.sqlite');
+    const item=db.prepare("SELECT document,revision FROM equipment_catalog WHERE name='Glock (9mm)'").get();
+    if(JSON.parse(item.document).item.price!==321||item.revision!==2)throw Error('Restart overwrote catalog edits');
+    if(db.prepare('SELECT count(*) n FROM equipment_catalog').get().n!==117)throw Error('Restart duplicated catalog seed');db.close();
+    restore('/data/backups/smoke.sqlite','/tmp/catalog-restored.sqlite');
+    const copy=new DatabaseSync('/tmp/catalog-restored.sqlite');
+    if(JSON.parse(copy.prepare("SELECT document FROM equipment_catalog WHERE name='Glock (9mm)'").get().document).item.price!==321)throw Error('Catalog backup/restore failed');copy.close();
+  `);
   assert(
     node(
       "import {DatabaseSync} from 'node:sqlite';const d=new DatabaseSync('/data/exilium.sqlite');console.log(d.prepare('SELECT count(*) n FROM users').get().n)",

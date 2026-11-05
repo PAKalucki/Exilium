@@ -26,6 +26,7 @@
   import { attributeGuides, playerHelp } from '../content/help';
   import { originDescriptions, casteDescriptions } from '../content/setting';
   import { unavailableRules, ruleSearch } from '../content/availability';
+  import { addKnowledgeSkill, renameKnowledge, removeKnowledge } from '../rules/knowledge';
   let {
     character = $bindable(),
     characterId,
@@ -45,6 +46,10 @@
     knowledge = $state(''),
     showItem = $state(false),
     search = $state('');
+  let knowledgeEditing = $state(''),
+    knowledgeName = $state(''),
+    knowledgeError = $state(''),
+    knowledgeMessage = $state('');
   const steps = [
     'Koncepcja',
     'Cechy',
@@ -74,12 +79,35 @@
       newHindrance = visibleHindrances[0]?.id || '';
   });
   function addKnowledge() {
-    const key = `knowledge:${knowledge.trim()}`;
-    if (knowledge.trim() && !character.build.skills[key]) {
-      character.build.skills[key] = 4;
+    knowledgeError = '';
+    knowledgeMessage = '';
+    try {
+      addKnowledgeSkill(character, knowledge);
       knowledge = '';
       onchange();
+    } catch (e) {
+      knowledgeError = (e as Error).message;
     }
+  }
+  function renameKnowledgeEntry() {
+    knowledgeError = '';
+    knowledgeMessage = '';
+    try {
+      renameKnowledge(character, knowledgeEditing, knowledgeName);
+      knowledgeEditing = '';
+      onchange();
+    } catch (e) {
+      knowledgeError = (e as Error).message;
+    }
+  }
+  function removeKnowledgeEntry(key: string) {
+    knowledgeError = '';
+    const affected = removeKnowledge(character, key);
+    if (knowledgeEditing === key) knowledgeEditing = '';
+    knowledgeMessage = affected
+      ? 'Usunięto dziedzinę Wiedzy. Wskaż nową dziedzinę w powiązanych przewagach.'
+      : 'Usunięto dziedzinę Wiedzy i przeliczono punkty.';
+    onchange();
   }
   function addItem(item: Item) {
     character.inventory.push(item);
@@ -479,30 +507,73 @@
       <div class="skill-editor">
         {#each [...skills, ...Object.keys(character.build.skills)
             .filter((k) => k.startsWith('knowledge:'))
-            .map((k) => skillInfo(k)!)] as s}<label class="skill-edit-row"
-            ><span>{s.name}<small>{attributes[s.attribute]}</small></span><select
-              aria-label={s.name}
-              value={character.build.skills[s.id] ?? 0}
-              onchange={(e) => {
-                const v = Number(e.currentTarget.value);
-                if (v === 0) delete character.build.skills[s.id];
-                else character.build.skills[s.id] = v as 4;
-                onchange();
-              }}
-              ><option value="0">Niewykupiona</option>{#each dice as die}<option value={die}
-                  >k{die}</option
-                >{/each}</select
-            ></label
-          >{/each}
+            .map((k) => skillInfo(k)!)] as s}<div class="knowledge-skill">
+            <label class="skill-edit-row"
+              ><span>{s.name}<small>{attributes[s.attribute]}</small></span><select
+                aria-label={s.name}
+                value={character.build.skills[s.id] ?? 0}
+                onchange={(e) => {
+                  const v = Number(e.currentTarget.value);
+                  if (v === 0 && s.id.startsWith('knowledge:')) {
+                    removeKnowledgeEntry(s.id);
+                    return;
+                  }
+                  if (v === 0) delete character.build.skills[s.id];
+                  else character.build.skills[s.id] = v as 4;
+                  onchange();
+                }}
+                ><option value="0">Niewykupiona</option>{#each dice as die}<option value={die}
+                    >k{die}</option
+                  >{/each}</select
+              ></label
+            >
+            {#if s.id.startsWith('knowledge:')}<div class="knowledge-actions">
+                <button
+                  type="button"
+                  class="text-button"
+                  aria-label={`Zmień nazwę ${s.name}`}
+                  onclick={() => {
+                    knowledgeEditing = s.id;
+                    knowledgeName = s.id.slice(10);
+                    knowledgeError = '';
+                  }}>Zmień nazwę</button
+                >
+                <button
+                  type="button"
+                  class="text-button danger"
+                  aria-label={`Usuń ${s.name}`}
+                  onclick={() => removeKnowledgeEntry(s.id)}>Usuń Wiedzę</button
+                >
+              </div>{/if}
+          </div>{/each}
       </div>
+      {#if knowledgeEditing}<div
+          class="panel knowledge-rename"
+          oninput={(event) => event.stopPropagation()}
+          onchange={(event) => event.stopPropagation()}
+        >
+          <label
+            >Nowa nazwa dziedziny Wiedzy<input bind:value={knowledgeName} maxlength="70" /></label
+          >
+          <button type="button" class="button secondary" onclick={renameKnowledgeEntry}
+            >Zapisz nazwę Wiedzy</button
+          >
+          <button type="button" class="text-button" onclick={() => (knowledgeEditing = '')}
+            >Anuluj zmianę nazwy</button
+          >
+        </div>{/if}
       <div class="inline-fields">
         <input
           aria-label="Dziedzina Wiedzy"
           bind:value={knowledge}
           placeholder="Dziedzina Wiedzy, np. Elektronika"
           maxlength="70"
+          oninput={(event) => event.stopPropagation()}
+          onchange={(event) => event.stopPropagation()}
         /><button class="button secondary" onclick={addKnowledge}>Dodaj Wiedzę</button>
       </div>
+      {#if knowledgeError}<p class="error" role="alert">{knowledgeError}</p>{/if}
+      {#if knowledgeMessage}<p class="small muted" role="status">{knowledgeMessage}</p>{/if}
     {:else if step === 4}
       <div class="budget-banner">
         <span>Ekwipunek / dostępne fundusze</span><strong

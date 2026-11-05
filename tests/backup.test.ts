@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Repository } from '../src/lib/server/db';
+import { newItem } from '../src/lib/rules/model';
 import { snapshot } from '../scripts/backup.mjs';
 import { restore } from '../scripts/restore.mjs';
 import { sample } from './fixtures';
@@ -43,6 +44,12 @@ describe('operational recovery', () => {
         },
       );
       const backup = join(dir, 'snapshot.sqlite');
+      const catalogEntry = repo.equipment.create(user.id, crypto.randomUUID(), {
+        category: 'Narzędzia',
+        source: 'Exilium — zapis drużyny',
+        item: { ...newItem(), name: 'Lutownica z warsztatu', price: 42 },
+      });
+      repo.equipment.change(user.id, catalogEntry.id, 1, crypto.randomUUID(), { type: 'archive' });
       await snapshot(join(dir, 'live.sqlite'), backup);
       expect(statSync(backup).mode & 0o777).toBe(0o600);
       expect(repo.session(token)).not.toBeNull();
@@ -55,6 +62,12 @@ describe('operational recovery', () => {
         expect(restoredCharacter.appearance).toContain('Blizna');
         expect(restored.portrait(user.id, restoredCharacter.portraitId!).width).toBe(96);
         expect(restored.session(token)).toBeNull();
+        expect(restored.equipment.read(catalogEntry.id)).toMatchObject({
+          status: 'archived',
+          document: { item: { price: 42 } },
+        });
+        expect(restored.equipment.history(catalogEntry.id)).toHaveLength(2);
+        expect(restored.equipment.list(true)).toHaveLength(repo.equipment.list(true).length);
       } finally {
         restored.db.close();
       }

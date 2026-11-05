@@ -202,7 +202,7 @@ describe('membership-bound application sessions', () => {
           expect(discordSessionAllowed(upgraded.session('legacy-session'))).toBe(false);
           expect(upgraded.get(user.id, character.id).document.name).toBe('Mara');
           expect(upgraded.db.prepare('SELECT MAX(version) v FROM schema_migrations').get()?.v).toBe(
-            3,
+            4,
           );
         } finally {
           upgraded.db.close();
