@@ -107,14 +107,14 @@ test('signed-in players can read all sheets and exports, while only creators can
     });
     expect(response.status()).toBe(200);
   };
-  const document = {
+  const draft = {
     ...sample(),
     name: 'Wspólny szkic',
     notes: 'Znaki na szlaku do Jericho.',
     appearance: 'Połatany płaszcz podróżny.',
   };
-  document.inventory.push({ ...newItem(), name: 'Mapa karawanowa', price: 10 });
-  await send({ type: 'saveDraft', document });
+  draft.inventory.push({ ...newItem(), name: 'Mapa karawanowa', price: 10 });
+  await send({ type: 'saveDraft', document: draft });
   const other = await browser.newContext({ baseURL: origin });
   await other.request.post('/auth/dev', { form: { player: 'b' }, headers: { Origin: origin } });
   for (const path of [
@@ -150,7 +150,7 @@ test('signed-in players can read all sheets and exports, while only creators can
   const baseline = await (await other.request.get(`/api/characters/${id}`)).json();
   for (const command of [
     { type: 'tracker', field: 'bennies', delta: -1 },
-    { type: 'saveDraft', document: { ...document, name: 'Cudza zmiana' } },
+    { type: 'saveDraft', document: { ...draft, name: 'Cudza zmiana' } },
     { type: 'archive' },
     { type: 'undo' },
     { type: 'removePortrait' },
