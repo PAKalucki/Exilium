@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- Allow grenade and other weapon quantities when they have no ammunition counters, in creator drafts and active-sheet purchases.
+- Keep weapons with ammunition counters separate and enforce their quantity limit in equipment forms.
+
 ## 0.2.2
 
 - Keep public source and documentation application-specific; remove PLAN.md and retain relevant design in docs.

@@ -1,7 +1,85 @@
 import { test, expect, type Page } from '@playwright/test';
 import { promote, adminLogin, resetPlayers } from './helpers';
 import { newItem } from '../../src/lib/rules/model';
+import { sample } from '../fixtures';
 const origin = 'http://127.0.0.1:5174';
+
+test('creator saves and restores two grenades from the catalog while guns remain individual', async ({
+  page,
+}) => {
+  await adminLogin(page);
+  const response = await page.request.post('/api/compendium', {
+    headers: { Origin: origin },
+    data: {
+      commandId: crypto.randomUUID(),
+      document: {
+        category: 'Granaty',
+        source: 'SW PL 2015, s. 61',
+        item: {
+          ...newItem(),
+          name: 'Granat do testu ilości',
+          kind: 'weapon',
+          price: 75,
+          damage: '3k6',
+          range: '5/10/20',
+        },
+      },
+    },
+  });
+  expect(response.status()).toBe(201);
+  const entry = await response.json();
+  const characterId = await draft(page, 'Dwa granaty');
+  const current = await (await page.request.get(`/api/characters/${characterId}`)).json();
+  expect(
+    (
+      await page.request.post(`/api/characters/${characterId}`, {
+        headers: { Origin: origin },
+        data: {
+          revision: current.revision,
+          commandId: crypto.randomUUID(),
+          command: { type: 'saveDraft', document: { ...sample(), name: 'Dwa granaty' } },
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  await page.reload();
+  await page.getByRole('button', { name: /05Ekwipunek|05 Ekwipunek/ }).click();
+  await page.getByRole('button', { name: 'Dodaj przedmiot', exact: false }).click();
+  const choices = page.getByLabel('Przedmiot z kompendium');
+  await choices.selectOption({ label: 'Glock (9mm) · 200 $' });
+  const quantity = page.getByLabel('Liczba sztuk');
+  await expect(quantity).toHaveAttribute('max', '1');
+  await quantity.fill('2');
+  expect(await quantity.evaluate((input: HTMLInputElement) => input.validity.rangeOverflow)).toBe(
+    true,
+  );
+  await choices.selectOption(entry.id);
+  await expect(quantity).toHaveAttribute('max', '10000');
+  await quantity.fill('2');
+  await page.getByRole('button', { name: 'Zapisz przedmiot', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('Zapisano');
+  const saved = await (await page.request.get(`/api/characters/${characterId}`)).json();
+  expect(saved.document.inventory).toHaveLength(1);
+  expect(saved.document.inventory[0]).toMatchObject({ quantity: 2, price: 75, kind: 'weapon' });
+  await page.reload();
+  await page.getByRole('button', { name: /05Ekwipunek|05 Ekwipunek/ }).click();
+  await expect(page.locator('.inventory-row')).toContainText('2 szt. · 150 $');
+  expect(
+    (
+      await page.request.post(`/api/characters/${characterId}`, {
+        headers: { Origin: origin },
+        data: {
+          revision: saved.revision,
+          commandId: crypto.randomUUID(),
+          command: { type: 'finalize' },
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  expect(
+    (await (await page.request.get(`/api/characters/${characterId}`)).json()).document.cash,
+  ).toBe(250);
+});
 async function login(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Wejdź do lokalnego podglądu' }).click();

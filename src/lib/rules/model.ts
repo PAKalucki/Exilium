@@ -33,6 +33,14 @@ export const buildSchema = z
       .strict(),
   })
   .strict();
+export function hasAmmunitionCounters(item: {
+  kind: string;
+  capacity: number;
+  loaded: number;
+  reserve: number;
+}) {
+  return item.kind === 'weapon' && (item.capacity > 0 || item.loaded > 0 || item.reserve > 0);
+}
 export const itemSchema = z
   .object({
     id: z.string().uuid(),
@@ -55,10 +63,10 @@ export const itemSchema = z
   })
   .strict()
   .refine((i) => i.loaded <= i.capacity, 'Amunicja przekracza pojemność magazynka')
-  .refine(
-    (i) => i.kind !== 'weapon' || i.quantity === 1,
-    'Każdy egzemplarz broni dodaj osobno, z własną amunicją.',
-  );
+  .refine((i) => !hasAmmunitionCounters(i) || i.quantity === 1, {
+    message: 'Broń z licznikiem amunicji dodawaj pojedynczo, z własnym magazynkiem i zapasem.',
+    path: ['quantity'],
+  });
 export const advanceChoice = z
   .object({
     kind: z.enum(['edge', 'attribute', 'skill', 'twoSkills', 'newSkill']),

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Item } from '../rules/model';
+  import { hasAmmunitionCounters, type Item } from '../rules/model';
   let { draft = $bindable() }: { draft: Item } = $props();
 </script>
 
@@ -15,7 +15,7 @@
       type="number"
       bind:value={draft.quantity}
       min="1"
-      max="10000"
+      max={hasAmmunitionCounters(draft) ? 1 : 10000}
       required
     /></label
   ><label
@@ -43,7 +43,11 @@
     >
   </div>
 </div>
-{#if draft.kind === 'weapon'}<div class="form-grid">
+{#if draft.kind === 'weapon'}<p class="small muted">
+    Granaty i broń bez licznika amunicji możesz zapisać w wielu sztukach. Broń z magazynkiem lub
+    zapasem amunicji dodawaj pojedynczo, aby każdy egzemplarz miał własny licznik.
+  </p>
+  <div class="form-grid">
     <label
       >Obrażenia<input bind:value={draft.damage} placeholder="np. 2k6+1" maxlength="160" /></label
     ><label

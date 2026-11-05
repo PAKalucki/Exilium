@@ -6,6 +6,8 @@ The initial database contains **117 entries** from the supplied Polish 2015 rule
 
 Book prices are a starting point for the group, not an assertion of Exilium availability. Update the source field when recording house prices or modified statistics. Unknown book weights remain unknown; the app does not invent a kilogram conversion. Fractional arrow prices are represented as two-arrow packs costing one dollar. Conditional armor, minimum Strength, rate of fire and other special rules remain in notes; laser-only armor is not added to general Toughness. Ammunition packs do not automatically refill a weapon's counters. The ordinary starting budget remains **400 dollars**.
 
+Grenades and other weapons without ammunition counters can share an inventory row with a quantity greater than one. Weapons with a magazine or ammunition reserve must be added one at a time so each retains its own counters. Prices and carried weight apply per piece. Grenades are consumed manually by changing the quantity or removing the final piece.
+
 ## Updating during play
 
 - Use **Dodaj wpis** for a new template or **Edytuj** for an existing one. Save explicitly with **Zapisz wpis kompendium**.

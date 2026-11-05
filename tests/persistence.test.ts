@@ -133,6 +133,63 @@ describe('shared reads and creator-only transactional character storage', () => 
     expect(() => send({ type: 'fire', id: item.id, rounds: 7 })).toThrow('Brak amunicji');
     expect(repo.get(owner, id).document.inventory[0].loaded).toBe(6);
   });
+  it('saves a draft with two grenades and charges for both when finalizing', () => {
+    const c = sample();
+    c.inventory.push({
+      ...newItem(),
+      kind: 'weapon',
+      name: 'Granat Mk67',
+      quantity: 2,
+      price: 75,
+      damage: '3k6',
+      range: '5/10/20',
+    });
+    send({ type: 'saveDraft', document: c });
+    expect(repo.get(owner, id).document.inventory[0]).toMatchObject({
+      quantity: 2,
+      kind: 'weapon',
+      damage: '3k6',
+      capacity: 0,
+      loaded: 0,
+      reserve: 0,
+    });
+    expect(send({ type: 'finalize' }).document.cash).toBe(250);
+  });
+  it('purchases a grenade stack once when an active-sheet request is retried', () => {
+    send({ type: 'finalize' });
+    const item = {
+      ...newItem(),
+      kind: 'weapon' as const,
+      name: 'Granat Mk67',
+      quantity: 2,
+      price: 75,
+      weight: 1,
+      damage: '3k6',
+      range: '5/10/20',
+    };
+    const commandId = crypto.randomUUID(),
+      revision = repo.get(owner, id).revision;
+    send({ type: 'item', item, purchase: true }, commandId, revision);
+    send({ type: 'item', item, purchase: true }, commandId, revision);
+    const saved = repo.get(owner, id);
+    expect(saved.document.cash).toBe(250);
+    expect(saved.document.inventory).toHaveLength(1);
+    expect(saved.document.inventory[0].quantity).toBe(2);
+  });
+  it.each([{ capacity: 6 }, { capacity: 6, loaded: 1 }, { reserve: 6 }])(
+    'rejects grouped weapons with ammunition counters %j without changing the sheet',
+    (counters) => {
+      const before = repo.get(owner, id),
+        events = repo.history(owner, id).length;
+      const item = { ...newItem(), kind: 'weapon' as const, quantity: 2, ...counters };
+      expect(() => send({ type: 'item', item, purchase: false })).toThrow();
+      const draft = structuredClone(before.document);
+      draft.inventory.push(item);
+      expect(() => send({ type: 'saveDraft', document: draft })).toThrow();
+      expect(repo.get(owner, id)).toEqual(before);
+      expect(repo.history(owner, id)).toHaveLength(events);
+    },
+  );
   it('rolls back an invalid monetary operation and creates no audit entry', () => {
     send({ type: 'finalize' });
     const before = repo.get(owner, id),
