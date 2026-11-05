@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: false,
@@ -18,7 +19,7 @@ export default defineConfig({
     env: {
       APP_ORIGIN: 'http://127.0.0.1:5174',
       APP_ADDITIONAL_ORIGINS: '',
-      DATABASE_PATH: `/tmp/exilium-e2e-${process.pid}.sqlite`,
+      DATABASE_PATH: `/tmp/exilium-e2e-${randomUUID()}.sqlite`,
       DEV_LOGIN_ENABLED: 'true',
       DISCORD_CLIENT_ID: '',
       DISCORD_CLIENT_SECRET: '',

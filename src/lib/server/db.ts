@@ -100,6 +100,7 @@ export class Repository {
     return {
       id: row.id as string,
       ownerId: row.owner_id as string,
+      ownerName: row.owner_name as string,
       status: row.status as CharacterRecord['status'],
       revision: Number(row.revision),
       updatedAt: row.updated_at as string,
@@ -108,19 +109,48 @@ export class Repository {
   }
   get(ownerId: string, id: string): CharacterRecord {
     const row = this.db
-      .prepare('SELECT * FROM characters WHERE id=? AND owner_id=?')
+      .prepare(
+        'SELECT c.*,u.name AS owner_name FROM characters c JOIN users u ON u.id=c.owner_id WHERE c.id=? AND c.owner_id=?',
+      )
       .get(id, ownerId);
     if (!row) throw new DomainError(404, 'Nie znaleziono postaci.');
     return this.record(row);
   }
   list(ownerId: string) {
     return this.db
-      .prepare('SELECT * FROM characters WHERE owner_id=? ORDER BY updated_at DESC')
+      .prepare(
+        'SELECT c.*,u.name AS owner_name FROM characters c JOIN users u ON u.id=c.owner_id WHERE c.owner_id=? ORDER BY c.updated_at DESC',
+      )
       .all(ownerId)
+      .map((row) => this.record(row));
+  }
+  // Shared reads are for authenticated routes only. Writes must continue to use get(ownerId, id).
+  read(id: string): CharacterRecord {
+    const row = this.db
+      .prepare(
+        'SELECT c.*,u.name AS owner_name FROM characters c JOIN users u ON u.id=c.owner_id WHERE c.id=?',
+      )
+      .get(id);
+    if (!row) throw new DomainError(404, 'Nie znaleziono postaci.');
+    return this.record(row);
+  }
+  listAll() {
+    return this.db
+      .prepare(
+        'SELECT c.*,u.name AS owner_name FROM characters c JOIN users u ON u.id=c.owner_id ORDER BY c.updated_at DESC',
+      )
+      .all()
       .map((row) => this.record(row));
   }
   history(ownerId: string, id: string) {
     this.get(ownerId, id);
+    return this.events(id);
+  }
+  readHistory(id: string) {
+    this.read(id);
+    return this.events(id);
+  }
+  private events(id: string) {
     return this.db
       .prepare(
         'SELECT id,kind,date FROM character_events WHERE character_id=? ORDER BY id DESC LIMIT 80',

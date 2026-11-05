@@ -16,7 +16,7 @@
     ></a
   >
   <nav aria-label="Główne">
-    <a href="/">Moje postacie</a><span class="edition">SAVAGE WORLDS <b>2015</b></span>
+    <a href="/">Postacie</a><span class="edition">SAVAGE WORLDS <b>2015</b></span>
   </nav>
   <div class="account">
     {#if data.user}<span class="online-dot"></span><span>{data.user.name}</span>

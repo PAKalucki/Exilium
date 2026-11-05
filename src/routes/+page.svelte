@@ -1,8 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
   import { rankName, totalXp, derived as calculateStats } from '../lib/rules/engine';
   import { portraitUrl } from '../lib/portraits';
   let { data } = $props();
+  let mounted = $state(false);
+  onMount(() => {
+    mounted = true;
+  });
   let name = $state(''),
     creating = $state(false),
     error = $state(''),
@@ -93,7 +98,9 @@
             >{characters.length.toString().padStart(2, '0')}</span
           >
         </h1>
-        <p class="muted">Wróć do swojej historii albo rozpocznij kolejną.</p>
+        <p class="muted">
+          Poznaj historie drużyny albo rozpocznij własną. Każdą kartę edytuje jej twórca.
+        </p>
       </div>
       <span class="system-stamp">TYLKO LUDZIE.<br />NIEOGRANICZONE HISTORIE.</span>
     </div>
@@ -107,11 +114,17 @@
     </div>
     <div class="library-toolbar">
       <div class="segmented">
-        <button class:chosen={!showArchived} onclick={() => (showArchived = false)}
-          >Moje postacie</button
-        ><button class:chosen={showArchived} onclick={() => (showArchived = true)}>Archiwum</button>
+        <button
+          disabled={!mounted}
+          class:chosen={!showArchived}
+          onclick={() => (showArchived = false)}>Wszystkie postacie</button
+        ><button
+          disabled={!mounted}
+          class:chosen={showArchived}
+          onclick={() => (showArchived = true)}>Archiwum</button
+        >
       </div>
-      <span class="small muted">Prywatne archiwum · tylko twoje karty</span>
+      <span class="small muted">Karty drużyny · widoczne po zalogowaniu</span>
     </div>
     <div class="character-grid">
       {#each characters as character}
@@ -139,6 +152,11 @@
           <div class="card-heading">
             <small>{c.profession || 'Niezapisana historia'} · {c.origin || 'Exilium'}</small>
             <h2>{c.name}</h2>
+            <p class="small muted">
+              Twórca: {character.ownerName}<br />{character.canEdit
+                ? 'Twoja karta · możesz edytować'
+                : 'Tylko do odczytu'}
+            </p>
             <span class="muted small"
               >{rankName(totalXp(c))} <span class="dot-separator">/</span> {totalXp(c)} PD</span
             >
@@ -166,7 +184,7 @@
             bind:value={name}
             maxlength="160"
             required
-          /><button class="button primary" disabled={creating || !name.trim()}
+          /><button class="button primary" disabled={!mounted || creating || !name.trim()}
             >{creating ? 'Tworzenie…' : 'Stwórz postać'} <span aria-hidden="true">→</span></button
           >
         </form>{/if}

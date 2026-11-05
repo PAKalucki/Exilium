@@ -2,7 +2,11 @@ import { dev } from '$app/env';
 import { config, authConfigured } from '../lib/server/config';
 import { repository } from '../lib/server/db';
 export const load = ({ locals, url }: { locals: App.Locals; url: URL }) => ({
-  characters: locals.user ? repository().list(locals.user.id) : [],
+  characters: locals.user
+    ? repository()
+        .listAll()
+        .map((record) => ({ ...record, canEdit: record.ownerId === locals.user!.id }))
+    : [],
   authReady: authConfigured(),
   developmentLogin: dev && config().devLogin,
   loginError:

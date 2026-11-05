@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { portraitFixture } from '../image-fixture';
+import { sample } from '../fixtures';
+import { newItem } from '../../src/lib/rules/model';
 const origin = 'http://127.0.0.1:5174';
 async function login(page: Page) {
   await page.goto('/');
@@ -32,9 +34,7 @@ async function create(page: Page, name: string) {
   await expect(page.getByRole('heading', { name: 'Trzymaj rękę na pulsie.' })).toBeVisible();
   return page.url().split('/').pop()!;
 }
-test('create, track, level up, persist, print and export a private Polish character', async ({
-  page,
-}) => {
+test('create, track, level up, persist, print and export a Polish character', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await login(page);
@@ -90,15 +90,31 @@ test('create, track, level up, persist, print and export a private Polish charac
   );
   expect(errors).toEqual([]);
 });
-test('other owners and cross-origin requests cannot access or mutate a sheet', async ({
+test('signed-in players can read all sheets and exports, while only creators can mutate them', async ({
   page,
   browser,
 }) => {
   await login(page);
-  await page.getByLabel('Imię nowej postaci').fill('Prywatny szkic');
+  await page.getByLabel('Imię nowej postaci').fill('Wspólny szkic');
   await page.getByRole('button', { name: 'Stwórz postać', exact: false }).click();
   await expect(page).toHaveURL(/\/characters\/[\w-]+$/);
   const id = page.url().split('/').pop()!;
+  const send = async (command: unknown) => {
+    const current = await (await page.request.get(`/api/characters/${id}`)).json();
+    const response = await page.request.post(`/api/characters/${id}`, {
+      headers: { Origin: origin },
+      data: { revision: current.revision, commandId: crypto.randomUUID(), command },
+    });
+    expect(response.status()).toBe(200);
+  };
+  const document = {
+    ...sample(),
+    name: 'Wspólny szkic',
+    notes: 'Znaki na szlaku do Jericho.',
+    appearance: 'Połatany płaszcz podróżny.',
+  };
+  document.inventory.push({ ...newItem(), name: 'Mapa karawanowa', price: 10 });
+  await send({ type: 'saveDraft', document });
   const other = await browser.newContext({ baseURL: origin });
   await other.request.post('/auth/dev', { form: { player: 'b' }, headers: { Origin: origin } });
   for (const path of [
@@ -107,16 +123,75 @@ test('other owners and cross-origin requests cannot access or mutate a sheet', a
     `/characters/${id}/print`,
     `/characters/${id}`,
   ])
-    expect((await other.request.get(path)).status()).toBe(404);
-  const response = await other.request.post(`/api/characters/${id}`, {
-    headers: { Origin: origin },
-    data: {
-      revision: 1,
-      commandId: crypto.randomUUID(),
-      command: { type: 'tracker', field: 'bennies', delta: -1 },
+    expect((await other.request.get(path)).status()).toBe(200);
+  const reader = await other.newPage();
+  await reader.goto('/');
+  const card = reader.locator('.character-card').filter({ hasText: 'Wspólny szkic' });
+  await expect(card).toContainText('Twórca: Gracz A');
+  await expect(card).toContainText('Tylko do odczytu');
+  await card.click();
+  await expect(reader.getByRole('status')).toHaveText('Tylko do odczytu');
+  await expect(reader.locator('.read-only-sheet')).toContainText('Znaki na szlaku do Jericho.');
+  await expect(reader.locator('.read-only-sheet')).toContainText('Mapa karawanowa');
+  await expect(reader.locator('.read-only-sheet')).toContainText('Połatany płaszcz podróżny.');
+  await expect(
+    reader.locator('.character-page input, .character-page select, .character-page textarea'),
+  ).toHaveCount(0);
+  await expect(
+    reader.getByRole('button', {
+      name: /Zatwierdź postać|Zwiększ Rany|Zapisz PD|Cofnij ostatnią zmianę|Przywróć postać/,
+    }),
+  ).toHaveCount(0);
+  await reader.getByRole('button', { name: 'Pomoc: Cechy a umiejętności', exact: true }).click();
+  await expect(
+    reader.getByRole('dialog', { name: 'Cechy a umiejętności', exact: true }),
+  ).toBeVisible();
+  await reader.keyboard.press('Escape');
+  const baseline = await (await other.request.get(`/api/characters/${id}`)).json();
+  for (const command of [
+    { type: 'tracker', field: 'bennies', delta: -1 },
+    { type: 'saveDraft', document: { ...document, name: 'Cudza zmiana' } },
+    { type: 'archive' },
+    { type: 'undo' },
+    { type: 'removePortrait' },
+    { type: 'xp', amount: 5, note: 'Cudza sesja' },
+  ])
+    expect(
+      (
+        await other.request.post(`/api/characters/${id}`, {
+          headers: { Origin: origin },
+          data: { revision: baseline.revision, commandId: crypto.randomUUID(), command },
+        })
+      ).status(),
+    ).toBe(404);
+  expect(
+    (
+      await other.request.post(`/api/characters/${id}/duplicate`, { headers: { Origin: origin } })
+    ).status(),
+  ).toBe(404);
+  expect(await (await other.request.get(`/api/characters/${id}`)).json()).toEqual(baseline);
+  await send({ type: 'finalize' });
+  await send({ type: 'xp', amount: 5, note: 'Pierwsza wspólna sesja' });
+  await send({
+    type: 'advance',
+    choice: {
+      kind: 'skill',
+      target: 'fighting',
+      second: '',
+      edgeTarget: '',
+      note: 'Trening na pustkowiu',
     },
   });
-  expect(response.status()).toBe(404);
+  await reader.getByRole('button', { name: 'Odśwież kartę' }).click();
+  await expect(reader.locator('.read-only-sheet')).toContainText('Pierwsza wspólna sesja');
+  await expect(reader.locator('.read-only-sheet')).toContainText('Trening na pustkowiu');
+  await expect(reader.locator('.skill-list').filter({ hasText: 'Walka' })).toContainText('k8');
+  await expect(reader.locator('.read-only-sheet .history-row')).toHaveCount(4);
+  await reader.setViewportSize({ width: 820, height: 1180 });
+  expect(
+    await reader.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+  ).toBe(false);
+  await reader.screenshot({ path: 'test-results/exilium-shared-sheet-tablet.png', fullPage: true });
   const cross = await page.request.post(`/api/characters/${id}`, {
     headers: { Origin: 'https://untrusted.example' },
     data: {
@@ -126,6 +201,25 @@ test('other owners and cross-origin requests cannot access or mutate a sheet', a
     },
   });
   expect(cross.status()).toBe(403);
+  await send({ type: 'archive' });
+  await reader.goto('/');
+  await reader.getByRole('button', { name: 'Archiwum', exact: true }).click();
+  await expect(
+    reader.locator('.character-card').filter({ hasText: 'Wspólny szkic' }),
+  ).toBeVisible();
+  await reader.locator('.character-card').filter({ hasText: 'Wspólny szkic' }).click();
+  await expect(reader.getByText('Ta postać jest w archiwum.', { exact: false })).toBeVisible();
+  await expect(reader.getByRole('button', { name: 'Przywróć postać' })).toHaveCount(0);
+  const anonymous = await browser.newContext({ baseURL: origin });
+  for (const suffix of ['', '/pdf', '/portrait'])
+    expect((await anonymous.request.get(`/api/characters/${id}${suffix}`)).status()).toBe(401);
+  const visitor = await anonymous.newPage();
+  await visitor.goto(`/characters/${id}`);
+  await expect(visitor).toHaveURL(origin + '/');
+  await expect(visitor.locator('.character-card')).toHaveCount(0);
+  await visitor.goto(`/characters/${id}/print`);
+  await expect(visitor).toHaveURL(origin + '/');
+  await anonymous.close();
   await other.close();
 });
 test('unsaved text survives a lost connection and is saved when connection returns', async ({
@@ -198,7 +292,7 @@ test('a lost response can be retried without spending a Fuks twice', async ({ pa
   await expect(page.locator('.bennies-block .tracker-controls>strong')).toHaveText('2');
 });
 
-test('portraits and appearance persist privately, and creation previews explain choices and GM wealth approval', async ({
+test('portraits are shared with signed-in readers and creation previews explain choices and GM wealth approval', async ({
   page,
   browser,
 }) => {
@@ -240,7 +334,9 @@ test('portraits and appearance persist privately, and creation previews explain 
   );
   const other = await browser.newContext({ baseURL: origin });
   await other.request.post('/auth/dev', { form: { player: 'b' }, headers: { Origin: origin } });
-  expect((await other.request.get(`/api/characters/${id}/portrait`)).status()).toBe(404);
+  const sharedImage = await other.request.get(`/api/characters/${id}/portrait`);
+  expect(sharedImage.status()).toBe(200);
+  expect(await sharedImage.body()).toEqual(await image.body());
   expect(
     (
       await other.request.post(`/api/characters/${id}/portrait`, {

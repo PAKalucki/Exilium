@@ -171,6 +171,7 @@ export type Advance = Character['advances'][number];
 export type CharacterRecord = {
   id: string;
   ownerId: string;
+  ownerName: string;
   status: 'draft' | 'active' | 'archived';
   revision: number;
   updatedAt: string;

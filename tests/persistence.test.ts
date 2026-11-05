@@ -17,19 +17,77 @@ beforeEach(() => {
   id = repo.create(owner, 'Łucja', sample()).id;
 });
 afterEach(() => repo.db.close());
-describe('private transactional character storage', () => {
-  it('blocks another owner from reads, writes and history', () => {
+describe('shared reads and creator-only transactional character storage', () => {
+  it('lists every character for shared reads while preserving owner-scoped access for writes', () => {
+    const otherRecord = repo.create(other, 'Druga postać');
+    expect(repo.listAll().map((record) => record.id)).toEqual(
+      expect.arrayContaining([id, otherRecord.id]),
+    );
+    expect(repo.read(id)).toMatchObject({ ownerId: owner, ownerName: 'A', status: 'draft' });
+    send({ type: 'finalize' });
+    expect(repo.read(id).status).toBe('active');
+    expect(repo.readHistory(id)).toEqual(repo.history(owner, id));
+    send({ type: 'archive' });
+    expect(repo.read(id).status).toBe('archived');
+    expect(repo.listAll().map((record) => record.id)).toContain(id);
+    repo.user('100000000000000001', 'Nowa nazwa');
+    expect(repo.read(id).ownerName).toBe('Nowa nazwa');
+    expect(() => repo.read(crypto.randomUUID())).toThrow(DomainError);
+  });
+  it('blocks every mutation by another creator even when the character is readable', () => {
     expect(() => repo.get(other, id)).toThrow(DomainError);
     expect(() => repo.history(other, id)).toThrow(DomainError);
-    expect(() =>
-      execute(repo, other, id, {
-        revision: 1,
-        commandId: crypto.randomUUID(),
-        command: { type: 'tracker', field: 'bennies', delta: -1 },
-      }),
-    ).toThrow('Nie znaleziono');
+    const document = repo.read(id).document;
+    const item = newItem();
+    const commands: Command[] = [
+      { type: 'saveDraft', document },
+      { type: 'finalize' },
+      {
+        type: 'profile',
+        name: 'Zmiana',
+        age: '',
+        origin: '',
+        caste: '',
+        profession: '',
+        affiliation: '',
+        motivation: '',
+        background: '',
+        notes: '',
+      },
+      { type: 'tracker', field: 'bennies', delta: -1 },
+      { type: 'condition', field: 'shaken', value: true },
+      { type: 'resetSession', confirmed: true },
+      { type: 'money', currency: 'cash', delta: 1, note: 'Zmiana' },
+      { type: 'item', item, purchase: false },
+      { type: 'removeItem', id: item.id },
+      { type: 'fire', id: item.id, rounds: 1 },
+      { type: 'reload', id: item.id },
+      { type: 'xp', amount: 5, note: 'Sesja' },
+      {
+        type: 'advance',
+        choice: { kind: 'skill', target: 'fighting', second: '', edgeTarget: '', note: '' },
+      },
+      { type: 'ruling', ruling: { code: 'narrative', reason: 'Zgoda MG', ruling: 'Ustalenie' } },
+      {
+        type: 'adjustments',
+        adjustments: { parry: 1, toughness: 0, pace: 0, charisma: 0, reason: 'Zgoda MG' },
+      },
+      { type: 'archive' },
+      { type: 'restore' },
+      { type: 'undo' },
+      { type: 'removePortrait' },
+    ];
+    for (const command of commands)
+      expect(() =>
+        execute(repo, other, id, {
+          revision: 1,
+          commandId: crypto.randomUUID(),
+          command,
+        }),
+      ).toThrow('Nie znaleziono');
     expect(repo.list(other)).toEqual([]);
     expect(repo.get(owner, id).revision).toBe(1);
+    expect(repo.readHistory(id)).toHaveLength(0);
   });
   it('deduplicates retries before the revision check, but rejects key reuse with a different command', () => {
     const commandId = crypto.randomUUID();

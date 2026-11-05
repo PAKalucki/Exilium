@@ -8,11 +8,11 @@ import { normalizePortrait, portraitBody } from '../../../../../lib/server/portr
 export function GET({ locals, params, url }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
-    const record = repository().get(locals.user.id, params.id),
+    const record = repository().read(params.id),
       id = record.document.portraitId;
     if (!id || (url.searchParams.has('v') && url.searchParams.get('v') !== id))
       throw new DomainError(404, 'Nie znaleziono portretu.');
-    const image = repository().portrait(locals.user.id, id);
+    const image = repository().portrait(record.ownerId, id);
     return new Response(new Uint8Array(image.data), {
       headers: {
         'Content-Type': 'image/jpeg',

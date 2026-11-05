@@ -4,7 +4,7 @@ import { exportView } from '../../../../lib/rules/export';
 export function load({ locals, params }: import('./$types').RequestEvent) {
   if (!locals.user) redirect(303, '/');
   try {
-    const record = repository().get(locals.user.id, params.id);
+    const record = repository().read(params.id);
     return {
       id: params.id,
       view: exportView(record.document),

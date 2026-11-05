@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { beforeNavigate } from '$app/navigation';
+  import { beforeNavigate, invalidateAll } from '$app/navigation';
   import {
     attributes,
     edges,
@@ -28,6 +28,7 @@
   import PortraitPicker from '../../../lib/components/PortraitPicker.svelte';
   import HelpPopover from '../../../lib/components/HelpPopover.svelte';
   import RuleDescription from '../../../lib/components/RuleDescription.svelte';
+  import ReadOnlyCharacter from '../../../lib/components/ReadOnlyCharacter.svelte';
   import { attributeGuides, playerHelp, skillHelp } from '../../../lib/content/help';
   import SettingChoice from '../../../lib/components/SettingChoice.svelte';
   import { originDescriptions, casteDescriptions } from '../../../lib/content/setting';
@@ -75,7 +76,13 @@
       : previewAdvance(character, choice).issues,
   );
   let locked = $derived(
-    !mounted || busy || !online || conflict || !!pending || record.status === 'archived',
+    !data.canEdit ||
+      !mounted ||
+      busy ||
+      !online ||
+      conflict ||
+      !!pending ||
+      record.status === 'archived',
   );
   const labels: Record<string, string> = {
     saveDraft: 'Zapis szkicu',
@@ -100,6 +107,7 @@
     removePortrait: 'Usunięcie portretu',
   };
   function changed() {
+    if (!data.canEdit) return;
     dirty = true;
     clearTimeout(timer);
     timer = setTimeout(() => save(), 700);
@@ -145,9 +153,16 @@
     )
       return;
     try {
-      const response = await fetch(`/api/characters/${record.id}`);
-      if (!response.ok) throw new Error('Nie udało się odświeżyć karty.');
-      const result = await response.json();
+      let result: CharacterRecord;
+      if (data.canEdit) {
+        const response = await fetch(`/api/characters/${record.id}`);
+        if (!response.ok) throw new Error('Nie udało się odświeżyć karty.');
+        result = await response.json();
+      } else {
+        await invalidateAll();
+        result = data.record;
+        history = data.history;
+      }
       record = result;
       character = clone(result.document);
       adjustments = clone(result.document.adjustments);
@@ -161,6 +176,7 @@
     }
   }
   async function deliver(payload: NonNullable<typeof pending>): Promise<boolean> {
+    if (!data.canEdit) return false;
     busy = true;
     message = '';
     const snapshot = JSON.stringify(character);
@@ -221,6 +237,7 @@
     }
   }
   async function save() {
+    if (!data.canEdit) return false;
     clearTimeout(timer);
     if (!dirty) return true;
     if (busy || pending || !online || conflict) return false;
@@ -244,7 +261,7 @@
     return deliver(pending);
   }
   async function send(command: ClientCommand): Promise<boolean> {
-    if (busy || pending || !online || conflict) return false;
+    if (!data.canEdit || busy || pending || !online || conflict) return false;
     if (dirty && !(await save())) return false;
     pending = {
       revision: record.revision,
@@ -260,7 +277,7 @@
     }
   }
   async function duplicate() {
-    if (busy || pending || !online || conflict) return;
+    if (!data.canEdit || busy || pending || !online || conflict) return;
     if (dirty && !(await save())) return;
     busy = true;
     try {
@@ -299,7 +316,7 @@
 <svelte:head><title>{character.name} · Exilium</title></svelte:head>
 <div class="page-wrap character-page">
   <div class="breadcrumb">
-    <a href="/">Moje postacie</a><span>/</span><span>{character.name}</span><span
+    <a href="/">Postacie</a><span>/</span><span>{character.name}</span><span
       class="save-status"
       aria-live="polite"
       role="status"
@@ -313,7 +330,9 @@
               ? 'Niezapisane zmiany'
               : message
                 ? 'Zapis wymaga uwagi'
-                : 'Zapisano'}</span
+                : !data.canEdit
+                  ? 'Tylko do odczytu'
+                  : 'Zapisano'}</span
     >
   </div>
   <div class="sheet-heading">
@@ -330,6 +349,7 @@
         {character.caste || 'CZŁOWIEK'}
       </p>
       <h1>{character.name}</h1>
+      <p class="small muted">Twórca: {record.ownerName}{data.canEdit ? ' · Twoja karta' : ''}</p>
       <p class="muted">
         {character.profession || 'Historia dopiero się zaczyna'}{character.motivation
           ? ` · ${character.motivation}`
@@ -337,17 +357,16 @@
       </p>
     </div>
     <div class="sheet-actions">
-      {#if record.status === 'draft'}<span class="badge">SZKIC</span><button
-          class="button primary"
-          disabled={locked}
-          onclick={() => send({ type: 'finalize' })}>Zatwierdź postać →</button
-        >{:else}<span class="rank-pill">{rankName(xp)} <span>/ {xp} PD</span></span><a
-          class="button secondary"
-          target="_blank"
-          rel="noopener"
-          href={`/characters/${record.id}/print`}>Drukuj ↗</a
-        ><a class="button secondary" href={`/api/characters/${record.id}/pdf`}>Pobierz PDF ↓</a
-        >{/if}
+      {#if record.status === 'draft'}<span class="badge">SZKIC</span>{#if data.canEdit}<button
+            class="button primary"
+            disabled={locked}
+            onclick={() => send({ type: 'finalize' })}>Zatwierdź postać →</button
+          >{/if}{:else}<span class="rank-pill">{rankName(xp)} <span>/ {xp} PD</span></span>{/if}<a
+        class="button secondary"
+        target="_blank"
+        rel="noopener"
+        href={`/characters/${record.id}/print`}>Drukuj ↗</a
+      ><a class="button secondary" href={`/api/characters/${record.id}/pdf`}>Pobierz PDF ↓</a>
     </div>
   </div>
   {#if message}<div class="error error-bar" role="alert">
@@ -365,565 +384,579 @@
       </div>
     </div>{/if}
   {#if record.status === 'archived'}<div class="notice">
-      Ta postać jest w archiwum. <button
-        class="text-button"
-        disabled={busy || !online || !!pending}
-        onclick={() => send({ type: 'restore' })}>Przywróć postać</button
-      >
+      Ta postać jest w archiwum. {#if data.canEdit}<button
+          class="text-button"
+          disabled={busy || !online || !!pending}
+          onclick={() => send({ type: 'restore' })}>Przywróć postać</button
+        >{/if}
     </div>{/if}
-  <nav class="sheet-tabs" aria-label="Karta postaci" inert={!mounted}>
-    {#if record.status === 'draft'}<button
-        class:current={tab === 'creator'}
-        onclick={() => (tab = 'creator')}
-        >Kreator <small>{budget.attributeSpent}/{budget.attributeTotal}</small></button
-      >{/if}<button class:current={tab === 'overview'} onclick={() => (tab = 'overview')}
-      >Karta postaci</button
-    ><button class:current={tab === 'equipment'} onclick={() => (tab = 'equipment')}
-      >Ekwipunek <small>{character.inventory.length}</small></button
-    ><button class:current={tab === 'development'} onclick={() => (tab = 'development')}
-      >Rozwój {#if availableAdvances(character) > 0}<small class="available-badge"
-          >{availableAdvances(character)}</small
-        >{/if}</button
-    ><button class:current={tab === 'notes'} onclick={() => (tab = 'notes')}>Notatki</button><button
-      class:current={tab === 'rulings'}
-      onclick={() => (tab = 'rulings')}>Decyzje MG</button
-    ><button class:current={tab === 'history'} onclick={() => (tab = 'history')}>Historia</button>
-  </nav>
-  <fieldset class="sheet-body" disabled={locked}>
-    {#if tab === 'creator'}<Creator
-        bind:character
-        characterId={record.id}
-        onchange={changed}
-        onupload={(file) => send({ type: 'portrait', file })}
-        onremove={() => send({ type: 'removePortrait' })}
-      />
-    {:else if tab === 'overview'}
-      <div class="overview-layout">
-        <div class="main-stats">
-          {#if character.appearance}<section class="panel appearance-panel">
-              <h3>Wygląd</h3>
-              <p>{character.appearance}</p>
-            </section>{/if}
-          <div class="stat-row">
-            {#each [['Obrona', d.parry, 'parry'], ['Wytrzymałość', d.totalToughness, 'toughness'], ['Tempo', d.pace, 'pace'], ['Charyzma', d.charisma, 'charisma']] as [label, value, helpKey]}<div
-                class="stat-tile"
-              >
-                <div class="help-heading">
-                  <span>{label}</span><HelpPopover help={playerHelp[helpKey as string]} />
-                </div>
-                <strong>{value}</strong><small
-                  >{label === 'Wytrzymałość'
-                    ? `${d.toughness} + ${d.armor} pancerza`
-                    : label === 'Tempo'
-                      ? `bieganie k${d.running}`
-                      : 'Wartość bieżąca'}</small
+  {#if !data.canEdit}
+    <div class="notice">
+      Karta jest widoczna dla wszystkich zalogowanych graczy. Edytować ją może tylko jej twórca: {record.ownerName}.
+      <button class="text-button" onclick={() => refresh(false)}>Odśwież kartę</button>
+    </div>
+    <ReadOnlyCharacter {record} {history} eventLabels={labels} />
+  {:else}
+    <nav class="sheet-tabs" aria-label="Karta postaci" inert={!mounted}>
+      {#if record.status === 'draft'}<button
+          class:current={tab === 'creator'}
+          onclick={() => (tab = 'creator')}
+          >Kreator <small>{budget.attributeSpent}/{budget.attributeTotal}</small></button
+        >{/if}<button class:current={tab === 'overview'} onclick={() => (tab = 'overview')}
+        >Karta postaci</button
+      ><button class:current={tab === 'equipment'} onclick={() => (tab = 'equipment')}
+        >Ekwipunek <small>{character.inventory.length}</small></button
+      ><button class:current={tab === 'development'} onclick={() => (tab = 'development')}
+        >Rozwój {#if availableAdvances(character) > 0}<small class="available-badge"
+            >{availableAdvances(character)}</small
+          >{/if}</button
+      ><button class:current={tab === 'notes'} onclick={() => (tab = 'notes')}>Notatki</button
+      ><button class:current={tab === 'rulings'} onclick={() => (tab = 'rulings')}
+        >Decyzje MG</button
+      ><button class:current={tab === 'history'} onclick={() => (tab = 'history')}>Historia</button>
+    </nav>
+    <fieldset class="sheet-body" disabled={locked}>
+      {#if tab === 'creator'}<Creator
+          bind:character
+          characterId={record.id}
+          onchange={changed}
+          onupload={(file) => send({ type: 'portrait', file })}
+          onremove={() => send({ type: 'removePortrait' })}
+        />
+      {:else if tab === 'overview'}
+        <div class="overview-layout">
+          <div class="main-stats">
+            {#if character.appearance}<section class="panel appearance-panel">
+                <h3>Wygląd</h3>
+                <p>{character.appearance}</p>
+              </section>{/if}
+            <div class="stat-row">
+              {#each [['Obrona', d.parry, 'parry'], ['Wytrzymałość', d.totalToughness, 'toughness'], ['Tempo', d.pace, 'pace'], ['Charyzma', d.charisma, 'charisma']] as [label, value, helpKey]}<div
+                  class="stat-tile"
                 >
-              </div>{/each}
-          </div>
-          <section class="panel attributes-panel">
-            <div class="section-heading">
-              <div class="help-heading">
-                <h3>Cechy</h3>
-                <HelpPopover help={playerHelp.attributes} />
-              </div>
-              <div class="help-heading">
-                <span class="small muted">Kość Figury: k6</span><HelpPopover
-                  help={playerHelp.dice}
-                />
-              </div>
-            </div>
-            <div class="attribute-display">
-              {#each Object.entries(attributes) as [key, label]}<div>
                   <div class="help-heading">
-                    <span>{label}</span><HelpPopover
-                      help={attributeGuides[key as keyof typeof attributes]}
-                    />
+                    <span>{label}</span><HelpPopover help={playerHelp[helpKey as string]} />
                   </div>
-                  <b class="die-badge"
-                    >{traitValue(d.build, key) > 12
-                      ? `k12+${traitValue(d.build, key) - 12}`
-                      : `k${traitValue(d.build, key)}`}</b
+                  <strong>{value}</strong><small
+                    >{label === 'Wytrzymałość'
+                      ? `${d.toughness} + ${d.armor} pancerza`
+                      : label === 'Tempo'
+                        ? `bieganie k${d.running}`
+                        : 'Wartość bieżąca'}</small
                   >
                 </div>{/each}
             </div>
-          </section>
-          <section class="panel">
-            <div class="section-heading">
-              <div class="help-heading">
-                <h3>Umiejętności</h3>
-                <HelpPopover help={playerHelp.skills} />
+            <section class="panel attributes-panel">
+              <div class="section-heading">
+                <div class="help-heading">
+                  <h3>Cechy</h3>
+                  <HelpPopover help={playerHelp.attributes} />
+                </div>
+                <div class="help-heading">
+                  <span class="small muted">Kość Figury: k6</span><HelpPopover
+                    help={playerHelp.dice}
+                  />
+                </div>
               </div>
-              <span class="small muted">Niewykupiona: k4−2</span>
+              <div class="attribute-display">
+                {#each Object.entries(attributes) as [key, label]}<div>
+                    <div class="help-heading">
+                      <span>{label}</span><HelpPopover
+                        help={attributeGuides[key as keyof typeof attributes]}
+                      />
+                    </div>
+                    <b class="die-badge"
+                      >{traitValue(d.build, key) > 12
+                        ? `k12+${traitValue(d.build, key) - 12}`
+                        : `k${traitValue(d.build, key)}`}</b
+                    >
+                  </div>{/each}
+              </div>
+            </section>
+            <section class="panel">
+              <div class="section-heading">
+                <div class="help-heading">
+                  <h3>Umiejętności</h3>
+                  <HelpPopover help={playerHelp.skills} />
+                </div>
+                <span class="small muted">Niewykupiona: k4−2</span>
+              </div>
+              <div class="skill-list">
+                {#each Object.keys(d.build.skills).sort( (a, b) => (skillInfo(a)?.name || a).localeCompare(skillInfo(b)?.name || b, 'pl') ) as key}<div
+                  >
+                    <div class="skill-name">
+                      <span
+                        >{skillInfo(key)?.name}<small>{attributes[skillInfo(key)!.attribute]}</small
+                        ></span
+                      ><HelpPopover help={skillHelp(key)} />
+                    </div>
+                    <strong
+                      >{traitValue(d.build, key) > 12
+                        ? `k12+${traitValue(d.build, key) - 12}`
+                        : `k${traitValue(d.build, key)}`}{#if d.skillModifiers[key]}
+                        <small class="modifier"
+                          >{d.skillModifiers[key] > 0 ? '+' : ''}{d.skillModifiers[key]}</small
+                        >{/if}</strong
+                    >
+                  </div>{/each}{#if !Object.keys(d.build.skills).length}<p class="muted">
+                    Umiejętności wybierzesz w kreatorze.
+                  </p>{/if}
+              </div>
+              <p class="small muted">
+                Modyfikatory sytuacyjne sprawdź w opisach przewag i zawad. {#if d.build.edges.some((e) => e.id === 'master')}Mistrz:
+                  Kość Figury k10 dla wybranych współczynników.{/if}
+              </p>
+            </section>
+            <div class="split-panel">
+              <section class="panel">
+                <div class="help-heading">
+                  <h3>Przewagi</h3>
+                  <HelpPopover help={playerHelp.edges} />
+                </div>
+                {#each d.build.edges as e}<div class="rule-entry">
+                    <b>{edges.find((v) => v.id === e.id)?.name}</b>
+                    <RuleDescription kind="edge" id={e.id} showTitle={false} />
+                  </div>{/each}
+              </section>
+              <section class="panel">
+                <div class="help-heading">
+                  <h3>Zawady</h3>
+                  <HelpPopover help={playerHelp.hindrances} />
+                </div>
+                {#each d.build.hindrances as h}<div class="rule-entry">
+                    <b
+                      >{hindrances.find((v) => v.id === h.id)?.name}
+                      <span class="muted small">{h.severity === 1 ? 'drobna' : 'poważna'}</span></b
+                    >
+                    <RuleDescription kind="hindrance" id={h.id} showTitle={false} />
+                  </div>{/each}
+              </section>
             </div>
-            <div class="skill-list">
-              {#each Object.keys(d.build.skills).sort( (a, b) => (skillInfo(a)?.name || a).localeCompare(skillInfo(b)?.name || b, 'pl') ) as key}<div
+          </div>
+          <aside class="session-panel">
+            <p class="eyebrow">PODCZAS SESJI</p>
+            <h2>Trzymaj rękę<br /><em>na pulsie.</em></h2>
+            <div class="tracker-block">
+              <div>
+                <div class="help-heading">
+                  <h3>Rany</h3>
+                  <HelpPopover help={playerHelp.wounds} />
+                </div>
+                <span>Kara −{d.woundPenalty}</span>
+              </div>
+              <div class="tracker-controls">
+                <button
+                  aria-label="Zmniejsz Rany"
+                  disabled={character.conditions.wounds === 0}
+                  onclick={() => send({ type: 'tracker', field: 'wounds', delta: -1 })}>−</button
+                ><strong>{character.conditions.wounds}<small> / 3</small></strong><button
+                  aria-label="Zwiększ Rany"
+                  disabled={character.conditions.wounds === 3}
+                  onclick={() => send({ type: 'tracker', field: 'wounds', delta: 1 })}>+</button
                 >
-                  <div class="skill-name">
-                    <span
-                      >{skillInfo(key)?.name}<small>{attributes[skillInfo(key)!.attribute]}</small
-                      ></span
-                    ><HelpPopover help={skillHelp(key)} />
-                  </div>
-                  <strong
-                    >{traitValue(d.build, key) > 12
-                      ? `k12+${traitValue(d.build, key) - 12}`
-                      : `k${traitValue(d.build, key)}`}{#if d.skillModifiers[key]}
-                      <small class="modifier"
-                        >{d.skillModifiers[key] > 0 ? '+' : ''}{d.skillModifiers[key]}</small
-                      >{/if}</strong
-                  >
-                </div>{/each}{#if !Object.keys(d.build.skills).length}<p class="muted">
-                  Umiejętności wybierzesz w kreatorze.
-                </p>{/if}
+              </div>
             </div>
-            <p class="small muted">
-              Modyfikatory sytuacyjne sprawdź w opisach przewag i zawad. {#if d.build.edges.some((e) => e.id === 'master')}Mistrz:
-                Kość Figury k10 dla wybranych współczynników.{/if}
+            <div class="tracker-block">
+              <div>
+                <div class="help-heading">
+                  <h3>Zmęczenie</h3>
+                  <HelpPopover help={playerHelp.fatigue} />
+                </div>
+                <span
+                  >{['Brak', 'Zmęczony', 'Wyczerpany', 'Wyeliminowany'][
+                    character.conditions.fatigue
+                  ]}</span
+                >
+              </div>
+              <div class="tracker-controls">
+                <button
+                  aria-label="Zmniejsz Zmęczenie"
+                  disabled={character.conditions.fatigue === 0}
+                  onclick={() => send({ type: 'tracker', field: 'fatigue', delta: -1 })}>−</button
+                ><strong>{character.conditions.fatigue}<small> / 3</small></strong><button
+                  aria-label="Zwiększ Zmęczenie"
+                  disabled={character.conditions.fatigue === 3}
+                  onclick={() => send({ type: 'tracker', field: 'fatigue', delta: 1 })}>+</button
+                >
+              </div>
+            </div>
+            <div class="tracker-block bennies-block">
+              <div>
+                <div class="help-heading">
+                  <h3>Fuksy</h3>
+                  <HelpPopover help={playerHelp.bennies} />
+                </div>
+                <span>Na początek sesji: {d.bennies}</span>
+              </div>
+              <div class="tracker-controls">
+                <button
+                  aria-label="Wydaj fuksa"
+                  disabled={character.conditions.bennies === 0}
+                  onclick={() => send({ type: 'tracker', field: 'bennies', delta: -1 })}>−</button
+                ><strong>{character.conditions.bennies}</strong><button
+                  aria-label="Dodaj fuksa"
+                  onclick={() => send({ type: 'tracker', field: 'bennies', delta: 1 })}>+</button
+                >
+              </div>
+            </div>
+            <div class="help-heading condition-help">
+              <span>Stany postaci</span><HelpPopover help={playerHelp.shaken} /><HelpPopover
+                help={playerHelp.incapacitated}
+              />
+            </div>
+            <button
+              class:state-on={character.conditions.shaken}
+              class="state-toggle"
+              aria-pressed={character.conditions.shaken}
+              onclick={() =>
+                send({ type: 'condition', field: 'shaken', value: !character.conditions.shaken })}
+              ><span>Szok</span><span
+                >{character.conditions.shaken ? 'TAK' : 'NIE'}
+                <span aria-hidden="true">{character.conditions.shaken ? '●' : '○'}</span></span
+              ></button
+            ><button
+              class:state-on={character.conditions.incapacitated}
+              class="state-toggle"
+              aria-pressed={character.conditions.incapacitated}
+              onclick={() =>
+                send({
+                  type: 'condition',
+                  field: 'incapacitated',
+                  value: !character.conditions.incapacitated,
+                })}
+              ><span>Wyeliminowanie (Rany)</span><span
+                >{character.conditions.incapacitated ? 'TAK' : 'NIE'}</span
+              ></button
+            >
+            <p class="session-penalty">Kara z Ran i Zmęczenia <b>−{d.penalty}</b></p>
+            {#if d.incapacitated}<p class="session-warning">
+                Postać jest wyeliminowana. Wynik rozstrzygnij przy stole.
+              </p>{/if}<button
+              class="button session-reset"
+              onclick={() => {
+                if (
+                  confirm(
+                    'Rozpocząć nową sesję i przywrócić początkową liczbę fuksów? Pozostałe stany pozostaną bez zmian.',
+                  )
+                )
+                  send({ type: 'resetSession', confirmed: true });
+              }}>Nowa sesja ↗</button
+            >
+            <p class="small session-footnote">
+              Liczniki zapisują się po każdej zmianie. Wyniki testów i odzyskiwanie sił
+              rozstrzygacie przy stole.
             </p>
-          </section>
-          <div class="split-panel">
-            <section class="panel">
-              <div class="help-heading">
-                <h3>Przewagi</h3>
-                <HelpPopover help={playerHelp.edges} />
-              </div>
-              {#each d.build.edges as e}<div class="rule-entry">
-                  <b>{edges.find((v) => v.id === e.id)?.name}</b>
-                  <RuleDescription kind="edge" id={e.id} showTitle={false} />
-                </div>{/each}
-            </section>
-            <section class="panel">
-              <div class="help-heading">
-                <h3>Zawady</h3>
-                <HelpPopover help={playerHelp.hindrances} />
-              </div>
-              {#each d.build.hindrances as h}<div class="rule-entry">
-                  <b
-                    >{hindrances.find((v) => v.id === h.id)?.name}
-                    <span class="muted small">{h.severity === 1 ? 'drobna' : 'poważna'}</span></b
-                  >
-                  <RuleDescription kind="hindrance" id={h.id} showTitle={false} />
-                </div>{/each}
-            </section>
-          </div>
+          </aside>
         </div>
-        <aside class="session-panel">
-          <p class="eyebrow">PODCZAS SESJI</p>
-          <h2>Trzymaj rękę<br /><em>na pulsie.</em></h2>
-          <div class="tracker-block">
-            <div>
-              <div class="help-heading">
-                <h3>Rany</h3>
-                <HelpPopover help={playerHelp.wounds} />
-              </div>
-              <span>Kara −{d.woundPenalty}</span>
-            </div>
-            <div class="tracker-controls">
-              <button
-                aria-label="Zmniejsz Rany"
-                disabled={character.conditions.wounds === 0}
-                onclick={() => send({ type: 'tracker', field: 'wounds', delta: -1 })}>−</button
-              ><strong>{character.conditions.wounds}<small> / 3</small></strong><button
-                aria-label="Zwiększ Rany"
-                disabled={character.conditions.wounds === 3}
-                onclick={() => send({ type: 'tracker', field: 'wounds', delta: 1 })}>+</button
-              >
-            </div>
-          </div>
-          <div class="tracker-block">
-            <div>
-              <div class="help-heading">
-                <h3>Zmęczenie</h3>
-                <HelpPopover help={playerHelp.fatigue} />
-              </div>
-              <span
-                >{['Brak', 'Zmęczony', 'Wyczerpany', 'Wyeliminowany'][
-                  character.conditions.fatigue
-                ]}</span
-              >
-            </div>
-            <div class="tracker-controls">
-              <button
-                aria-label="Zmniejsz Zmęczenie"
-                disabled={character.conditions.fatigue === 0}
-                onclick={() => send({ type: 'tracker', field: 'fatigue', delta: -1 })}>−</button
-              ><strong>{character.conditions.fatigue}<small> / 3</small></strong><button
-                aria-label="Zwiększ Zmęczenie"
-                disabled={character.conditions.fatigue === 3}
-                onclick={() => send({ type: 'tracker', field: 'fatigue', delta: 1 })}>+</button
-              >
-            </div>
-          </div>
-          <div class="tracker-block bennies-block">
-            <div>
-              <div class="help-heading">
-                <h3>Fuksy</h3>
-                <HelpPopover help={playerHelp.bennies} />
-              </div>
-              <span>Na początek sesji: {d.bennies}</span>
-            </div>
-            <div class="tracker-controls">
-              <button
-                aria-label="Wydaj fuksa"
-                disabled={character.conditions.bennies === 0}
-                onclick={() => send({ type: 'tracker', field: 'bennies', delta: -1 })}>−</button
-              ><strong>{character.conditions.bennies}</strong><button
-                aria-label="Dodaj fuksa"
-                onclick={() => send({ type: 'tracker', field: 'bennies', delta: 1 })}>+</button
-              >
-            </div>
-          </div>
-          <div class="help-heading condition-help">
-            <span>Stany postaci</span><HelpPopover help={playerHelp.shaken} /><HelpPopover
-              help={playerHelp.incapacitated}
-            />
+      {:else if tab === 'equipment'}
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">TO, CO ZABIERASZ W DROGĘ</p>
+            <h2>Ekwipunek i zasoby</h2>
           </div>
           <button
-            class:state-on={character.conditions.shaken}
-            class="state-toggle"
-            aria-pressed={character.conditions.shaken}
-            onclick={() =>
-              send({ type: 'condition', field: 'shaken', value: !character.conditions.shaken })}
-            ><span>Szok</span><span
-              >{character.conditions.shaken ? 'TAK' : 'NIE'}
-              <span aria-hidden="true">{character.conditions.shaken ? '●' : '○'}</span></span
-            ></button
-          ><button
-            class:state-on={character.conditions.incapacitated}
-            class="state-toggle"
-            aria-pressed={character.conditions.incapacitated}
-            onclick={() =>
-              send({
-                type: 'condition',
-                field: 'incapacitated',
-                value: !character.conditions.incapacitated,
-              })}
-            ><span>Wyeliminowanie (Rany)</span><span
-              >{character.conditions.incapacitated ? 'TAK' : 'NIE'}</span
-            ></button
-          >
-          <p class="session-penalty">Kara z Ran i Zmęczenia <b>−{d.penalty}</b></p>
-          {#if d.incapacitated}<p class="session-warning">
-              Postać jest wyeliminowana. Wynik rozstrzygnij przy stole.
-            </p>{/if}<button
-            class="button session-reset"
+            class="button primary"
             onclick={() => {
-              if (
-                confirm(
-                  'Rozpocząć nową sesję i przywrócić początkową liczbę fuksów? Pozostałe stany pozostaną bez zmian.',
-                )
-              )
-                send({ type: 'resetSession', confirmed: true });
-            }}>Nowa sesja ↗</button
-          >
-          <p class="small session-footnote">
-            Liczniki zapisują się po każdej zmianie. Wyniki testów i odzyskiwanie sił rozstrzygacie
-            przy stole.
-          </p>
-        </aside>
-      </div>
-    {:else if tab === 'equipment'}
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">TO, CO ZABIERASZ W DROGĘ</p>
-          <h2>Ekwipunek i zasoby</h2>
-        </div>
-        <button
-          class="button primary"
-          onclick={() => {
-            editingItem = null;
-            showItem = true;
-          }}>+ Dodaj przedmiot</button
-        >
-      </div>
-      <div class="resource-grid">
-        <div class="panel resource">
-          <span>GOTÓWKA</span><strong>{character.cash}<small> $</small></strong>
-        </div>
-        <div class="panel resource">
-          <span>KREDYTY ELEKTRONICZNE</span><strong>{character.credits}</strong>
-        </div>
-        <div class="panel resource">
-          <span>NIESIONA WAGA / UDŹWIG</span><strong
-            >{d.weightKnown}<small> / {d.capacity}</small></strong
-          ><small
-            >{d.weightUnknown ? 'Część wag jest nieznana.' : 'Jednostki podręcznika.'}
-            {d.encumbrance ? `Przeciążenie co najmniej −${d.encumbrance}.` : ''}</small
+              editingItem = null;
+              showItem = true;
+            }}>+ Dodaj przedmiot</button
           >
         </div>
-      </div>
-      {#if showItem}<ItemEditor
-          item={editingItem}
-          {busy}
-          onsave={itemSave}
-          oncancel={() => {
-            showItem = false;
-            editingItem = null;
-          }}
-        />{/if}
-      <div class="panel inventory-list">
-        {#if !character.inventory.length}<p class="muted">
-            Jeszcze nic tu nie ma. Dodaj to, co bierzesz ze sobą.
-          </p>{/if}{#each character.inventory as item}<article class="inventory-detail">
-            <div class="inventory-heading">
-              <div>
-                <span class="eyebrow"
-                  >{item.kind === 'weapon'
-                    ? 'BROŃ'
-                    : item.kind === 'armor'
-                      ? 'PANCERZ'
-                      : item.kind === 'cybernetic'
-                        ? 'CYBERNETYKA'
-                        : 'SPRZĘT'}
-                  {item.equipped ? ' / UŻYWANY' : ''}</span
-                >
-                <h3>{item.name} {item.quantity > 1 ? `×${item.quantity}` : ''}</h3>
-              </div>
-              <div class="inline-fields">
-                <button
-                  class="text-button"
-                  onclick={() => {
-                    editingItem = clone(item);
-                    showItem = true;
-                  }}>Edytuj</button
-                ><button
-                  class="text-button"
-                  onclick={() => {
-                    if (confirm(`Usunąć ${item.name}?`)) send({ type: 'removeItem', id: item.id });
-                  }}>Usuń</button
-                >
-              </div>
-            </div>
-            {#if item.damage}<p>
-                Obrażenia <b>{item.damage}</b> <span class="dot-separator">/</span> Zasięg {item.range ||
-                  '—'}
-              </p>{/if}{#if item.kind === 'weapon' && item.capacity > 0}<div class="ammo-controls">
-                <span>AMUNICJA <b>{item.loaded} / {item.capacity}</b></span><span
-                  >ZAPAS <b>{item.reserve}</b></span
-                ><button
-                  class="button secondary compact"
-                  disabled={item.loaded === 0}
-                  onclick={() => send({ type: 'fire', id: item.id, rounds: 1 })}
-                  >Zużyj 1 nabój</button
-                ><button
-                  class="button secondary compact"
-                  disabled={item.reserve === 0 || item.loaded === item.capacity}
-                  onclick={() => send({ type: 'reload', id: item.id })}>Przeładuj</button
-                >
-              </div>{/if}
-            <p class="small muted">{item.notes}</p>
-            <small class="muted"
-              >{item.carried ? 'Niesiony' : 'Przechowywany'} · {item.weight ?? '?'} jedn. / szt.{item.kind ===
-              'armor'
-                ? ` · Pancerz ${item.armor}`
-                : ''}</small
+        <div class="resource-grid">
+          <div class="panel resource">
+            <span>GOTÓWKA</span><strong>{character.cash}<small> $</small></strong>
+          </div>
+          <div class="panel resource">
+            <span>KREDYTY ELEKTRONICZNE</span><strong>{character.credits}</strong>
+          </div>
+          <div class="panel resource">
+            <span>NIESIONA WAGA / UDŹWIG</span><strong
+              >{d.weightKnown}<small> / {d.capacity}</small></strong
+            ><small
+              >{d.weightUnknown ? 'Część wag jest nieznana.' : 'Jednostki podręcznika.'}
+              {d.encumbrance ? `Przeciążenie co najmniej −${d.encumbrance}.` : ''}</small
             >
-          </article>{/each}
-      </div>
-      <section class="panel">
-        <h3>Zapisz zmianę funduszy</h3>
-        <form
-          class="money-form"
-          onsubmit={(e) => {
-            e.preventDefault();
-            money();
-          }}
-        >
-          <label
-            >Rodzaj<select bind:value={currency}
-              ><option value="cash">Gotówka ($)</option><option value="credits">Kredyty</option
-              ></select
-            ></label
-          ><label>Zmiana (+/−)<input type="number" bind:value={moneyDelta} required /></label><label
-            >Uzasadnienie<input
-              bind:value={moneyNote}
-              maxlength="160"
-              placeholder="Zakup, zapłata, nagroda…"
-              required
-            /></label
-          ><button class="button secondary" disabled={!moneyNote.trim()}>Zapisz zmianę</button>
-        </form>
-        <p class="small muted">
-          Gotówka i kredyty mają osobne salda. Brak automatycznego kursu wymiany.
-        </p>
-      </section>
-    {:else if tab === 'development'}{#if record.status === 'draft'}<div class="notice">
-          Najpierw zatwierdź postać w kreatorze. Następnie zapiszesz PD i wydasz rozwinięcia.
-        </div>{:else}<Development
-          {character}
-          bind:choice
-          busy={locked}
-          oncommand={send}
-          onruling={openRuling}
-        />{/if}
-    {:else if tab === 'notes'}<div class="section-heading">
-        <div>
-          <p class="eyebrow">WIĘCEJ NIŻ WSPÓŁCZYNNIKI</p>
-          <h2>Historia i notatki</h2>
+          </div>
         </div>
-      </div>
-      <PortraitPicker
-        characterId={record.id}
-        portraitId={character.portraitId}
-        onupload={(file) => send({ type: 'portrait', file })}
-        onremove={() => send({ type: 'removePortrait' })}
-      />
-      <div oninput={changed}>
-        <label>Imię<input bind:value={character.name} maxlength="160" /></label>
-        <div class="form-grid">
-          <label>Wiek<input bind:value={character.age} maxlength="160" /></label>
-          <SettingChoice
-            label="Pochodzenie"
-            bind:value={character.origin}
-            options={origins}
-            descriptions={originDescriptions}
-            help={playerHelp.origin}
-            onchange={changed}
-          />
-          <SettingChoice
-            label="Status społeczny"
-            bind:value={character.caste}
-            options={castes}
-            descriptions={casteDescriptions}
-            help={playerHelp.caste}
-            onchange={changed}
-          />
-          <SettingChoice
-            label="Profesja"
-            bind:value={character.profession}
-            options={professions}
-            help={playerHelp.profession}
-            onchange={changed}
-          /><label>Afiliacje<input bind:value={character.affiliation} maxlength="160" /></label
-          ><label>Motywacja<input bind:value={character.motivation} maxlength="160" /></label>
+        {#if showItem}<ItemEditor
+            item={editingItem}
+            {busy}
+            onsave={itemSave}
+            oncancel={() => {
+              showItem = false;
+              editingItem = null;
+            }}
+          />{/if}
+        <div class="panel inventory-list">
+          {#if !character.inventory.length}<p class="muted">
+              Jeszcze nic tu nie ma. Dodaj to, co bierzesz ze sobą.
+            </p>{/if}{#each character.inventory as item}<article class="inventory-detail">
+              <div class="inventory-heading">
+                <div>
+                  <span class="eyebrow"
+                    >{item.kind === 'weapon'
+                      ? 'BROŃ'
+                      : item.kind === 'armor'
+                        ? 'PANCERZ'
+                        : item.kind === 'cybernetic'
+                          ? 'CYBERNETYKA'
+                          : 'SPRZĘT'}
+                    {item.equipped ? ' / UŻYWANY' : ''}</span
+                  >
+                  <h3>{item.name} {item.quantity > 1 ? `×${item.quantity}` : ''}</h3>
+                </div>
+                <div class="inline-fields">
+                  <button
+                    class="text-button"
+                    onclick={() => {
+                      editingItem = clone(item);
+                      showItem = true;
+                    }}>Edytuj</button
+                  ><button
+                    class="text-button"
+                    onclick={() => {
+                      if (confirm(`Usunąć ${item.name}?`))
+                        send({ type: 'removeItem', id: item.id });
+                    }}>Usuń</button
+                  >
+                </div>
+              </div>
+              {#if item.damage}<p>
+                  Obrażenia <b>{item.damage}</b> <span class="dot-separator">/</span> Zasięg {item.range ||
+                    '—'}
+                </p>{/if}{#if item.kind === 'weapon' && item.capacity > 0}<div
+                  class="ammo-controls"
+                >
+                  <span>AMUNICJA <b>{item.loaded} / {item.capacity}</b></span><span
+                    >ZAPAS <b>{item.reserve}</b></span
+                  ><button
+                    class="button secondary compact"
+                    disabled={item.loaded === 0}
+                    onclick={() => send({ type: 'fire', id: item.id, rounds: 1 })}
+                    >Zużyj 1 nabój</button
+                  ><button
+                    class="button secondary compact"
+                    disabled={item.reserve === 0 || item.loaded === item.capacity}
+                    onclick={() => send({ type: 'reload', id: item.id })}>Przeładuj</button
+                  >
+                </div>{/if}
+              <p class="small muted">{item.notes}</p>
+              <small class="muted"
+                >{item.carried ? 'Niesiony' : 'Przechowywany'} · {item.weight ?? '?'} jedn. / szt.{item.kind ===
+                'armor'
+                  ? ` · Pancerz ${item.armor}`
+                  : ''}</small
+              >
+            </article>{/each}
         </div>
-        <label
-          >Wygląd (opcjonalnie)<textarea bind:value={character.appearance} rows="3" maxlength="4000"
-          ></textarea></label
-        ><label
-          >Historia postaci<textarea bind:value={character.background} rows="10" maxlength="12000"
-          ></textarea></label
-        ><label
-          >Notatki z sesji<textarea
-            bind:value={character.notes}
-            rows="12"
-            maxlength="12000"
-            placeholder="Nazwiska, długi, miejsca i sprawy, których lepiej nie zapomnieć."
-          ></textarea></label
-        >
-      </div>
-    {:else if tab === 'rulings'}<div class="section-heading">
-        <div>
-          <p class="eyebrow">ZASADY WASZEGO STOŁU</p>
-          <h2>Decyzje MG</h2>
-        </div>
-      </div>
-      <p class="muted">
-        Zapisujesz ustalenie otrzymane od MG. To zapis gracza; nie wymaga osobnego zatwierdzenia w
-        aplikacji.
-      </p>
-      <form
-        class="panel"
-        onsubmit={(e) => {
-          e.preventDefault();
-          ruling();
-        }}
-      >
-        <label
-          >Czego dotyczy decyzja?<select bind:value={rulingCode}
-            ><option value="narrative">Ustalenie opisowe</option
-            >{#each issues.filter((i) => !i.waived) as issue}<option value={issue.code}
-                >{issue.message}</option
-              >{/each}{#if rulingCode !== 'narrative' && !issues.some((i) => i.code === rulingCode)}<option
-                value={rulingCode}>Wybrana reguła rozwinięcia</option
-              >{/if}</select
-          ></label
-        >
-        <div class="form-grid">
-          <label
-            >Ustalenie MG<input
-              bind:value={rulingText}
-              required
-              minlength="3"
-              maxlength="160"
-            /></label
-          ><label
-            >Uzasadnienie / kto ustalił<input
-              bind:value={rulingReason}
-              required
-              minlength="3"
-              maxlength="160"
-            /></label
+        <section class="panel">
+          <h3>Zapisz zmianę funduszy</h3>
+          <form
+            class="money-form"
+            onsubmit={(e) => {
+              e.preventDefault();
+              money();
+            }}
           >
-        </div>
-        <button class="button secondary">Zapisz decyzję</button>
-      </form>
-      <form
-        class="panel"
-        onsubmit={(e) => {
-          e.preventDefault();
-          send({ type: 'adjustments', adjustments });
-        }}
-      >
-        <h3>Jawne korekty współczynników</h3>
-        <div class="form-grid four">
-          {#each [['parry', 'Obrona'], ['toughness', 'Wytrzymałość'], ['pace', 'Tempo'], ['charisma', 'Charyzma']] as [key, label]}<label
-              >{label}<input
-                type="number"
-                bind:value={adjustments[key as 'parry']}
-                min={key === 'pace' ? -6 : -20}
-                max="20"
+            <label
+              >Rodzaj<select bind:value={currency}
+                ><option value="cash">Gotówka ($)</option><option value="credits">Kredyty</option
+                ></select
+              ></label
+            ><label>Zmiana (+/−)<input type="number" bind:value={moneyDelta} required /></label
+            ><label
+              >Uzasadnienie<input
+                bind:value={moneyNote}
+                maxlength="160"
+                placeholder="Zakup, zapłata, nagroda…"
                 required
               /></label
-            >{/each}
+            ><button class="button secondary" disabled={!moneyNote.trim()}>Zapisz zmianę</button>
+          </form>
+          <p class="small muted">
+            Gotówka i kredyty mają osobne salda. Brak automatycznego kursu wymiany.
+          </p>
+        </section>
+      {:else if tab === 'development'}{#if record.status === 'draft'}<div class="notice">
+            Najpierw zatwierdź postać w kreatorze. Następnie zapiszesz PD i wydasz rozwinięcia.
+          </div>{:else}<Development
+            {character}
+            bind:choice
+            busy={locked}
+            oncommand={send}
+            onruling={openRuling}
+          />{/if}
+      {:else if tab === 'notes'}<div class="section-heading">
+          <div>
+            <p class="eyebrow">WIĘCEJ NIŻ WSPÓŁCZYNNIKI</p>
+            <h2>Historia i notatki</h2>
+          </div>
         </div>
-        <label
-          >Uzasadnienie MG<input
-            bind:value={adjustments.reason}
-            minlength="3"
-            maxlength="160"
-            required
-          /></label
-        ><button class="button secondary">Zapisz korekty</button>
-      </form>
-      {#each character.rulings as r}<div class="panel ruling-entry">
-          <span class="eyebrow">DECYZJA MG — ZAPISANA PRZEZ GRACZA</span>
-          <h3>{r.ruling}</h3>
-          <p>{r.reason}</p>
-          <small class="muted">{new Date(r.date).toLocaleString('pl-PL')}</small>
-        </div>{/each}
-    {:else if tab === 'history'}<div class="section-heading">
-        <div>
-          <p class="eyebrow">ŚLADY NA PIASKU</p>
-          <h2>Historia zmian</h2>
+        <PortraitPicker
+          characterId={record.id}
+          portraitId={character.portraitId}
+          onupload={(file) => send({ type: 'portrait', file })}
+          onremove={() => send({ type: 'removePortrait' })}
+        />
+        <div oninput={changed}>
+          <label>Imię<input bind:value={character.name} maxlength="160" /></label>
+          <div class="form-grid">
+            <label>Wiek<input bind:value={character.age} maxlength="160" /></label>
+            <SettingChoice
+              label="Pochodzenie"
+              bind:value={character.origin}
+              options={origins}
+              descriptions={originDescriptions}
+              help={playerHelp.origin}
+              onchange={changed}
+            />
+            <SettingChoice
+              label="Status społeczny"
+              bind:value={character.caste}
+              options={castes}
+              descriptions={casteDescriptions}
+              help={playerHelp.caste}
+              onchange={changed}
+            />
+            <SettingChoice
+              label="Profesja"
+              bind:value={character.profession}
+              options={professions}
+              help={playerHelp.profession}
+              onchange={changed}
+            /><label>Afiliacje<input bind:value={character.affiliation} maxlength="160" /></label
+            ><label>Motywacja<input bind:value={character.motivation} maxlength="160" /></label>
+          </div>
+          <label
+            >Wygląd (opcjonalnie)<textarea
+              bind:value={character.appearance}
+              rows="3"
+              maxlength="4000"></textarea></label
+          ><label
+            >Historia postaci<textarea bind:value={character.background} rows="10" maxlength="12000"
+            ></textarea></label
+          ><label
+            >Notatki z sesji<textarea
+              bind:value={character.notes}
+              rows="12"
+              maxlength="12000"
+              placeholder="Nazwiska, długi, miejsca i sprawy, których lepiej nie zapomnieć."
+            ></textarea></label
+          >
         </div>
-        <button
-          class="button secondary"
-          onclick={() => {
-            if (confirm('Cofnąć ostatnią zapisaną zmianę?')) send({ type: 'undo' });
-          }}>Cofnij ostatnią zmianę</button
+      {:else if tab === 'rulings'}<div class="section-heading">
+          <div>
+            <p class="eyebrow">ZASADY WASZEGO STOŁU</p>
+            <h2>Decyzje MG</h2>
+          </div>
+        </div>
+        <p class="muted">
+          Zapisujesz ustalenie otrzymane od MG. To zapis gracza; nie wymaga osobnego zatwierdzenia w
+          aplikacji.
+        </p>
+        <form
+          class="panel"
+          onsubmit={(e) => {
+            e.preventDefault();
+            ruling();
+          }}
         >
-      </div>
-      <p class="muted small">
-        Cofanie obejmuje wyłącznie ostatnią zmianę. Dzięki temu późniejsze rozwinięcia nie tracą
-        swoich wymagań.
-      </p>
-      <div class="panel">
-        {#each history as event}<div class="history-row">
-            <span class="history-dot"></span><b>{labels[event.kind] || event.kind}</b><time
-              >{new Date(event.date).toLocaleString('pl-PL')}</time
+          <label
+            >Czego dotyczy decyzja?<select bind:value={rulingCode}
+              ><option value="narrative">Ustalenie opisowe</option
+              >{#each issues.filter((i) => !i.waived) as issue}<option value={issue.code}
+                  >{issue.message}</option
+                >{/each}{#if rulingCode !== 'narrative' && !issues.some((i) => i.code === rulingCode)}<option
+                  value={rulingCode}>Wybrana reguła rozwinięcia</option
+                >{/if}</select
+            ></label
+          >
+          <div class="form-grid">
+            <label
+              >Ustalenie MG<input
+                bind:value={rulingText}
+                required
+                minlength="3"
+                maxlength="160"
+              /></label
+            ><label
+              >Uzasadnienie / kto ustalił<input
+                bind:value={rulingReason}
+                required
+                minlength="3"
+                maxlength="160"
+              /></label
             >
-          </div>{/each}{#if !history.length}<p class="muted">
-            Historia zacznie się od pierwszej zmiany.
-          </p>{/if}
-      </div>
-      <button class="button secondary" onclick={duplicate}>Utwórz kopię jako szkic</button>
-      <button
-        class="text-button danger"
-        onclick={() => {
-          if (confirm('Przenieść postać do archiwum?')) send({ type: 'archive' });
-        }}>Przenieś do archiwum</button
-      >
-    {/if}
-  </fieldset>
+          </div>
+          <button class="button secondary">Zapisz decyzję</button>
+        </form>
+        <form
+          class="panel"
+          onsubmit={(e) => {
+            e.preventDefault();
+            send({ type: 'adjustments', adjustments });
+          }}
+        >
+          <h3>Jawne korekty współczynników</h3>
+          <div class="form-grid four">
+            {#each [['parry', 'Obrona'], ['toughness', 'Wytrzymałość'], ['pace', 'Tempo'], ['charisma', 'Charyzma']] as [key, label]}<label
+                >{label}<input
+                  type="number"
+                  bind:value={adjustments[key as 'parry']}
+                  min={key === 'pace' ? -6 : -20}
+                  max="20"
+                  required
+                /></label
+              >{/each}
+          </div>
+          <label
+            >Uzasadnienie MG<input
+              bind:value={adjustments.reason}
+              minlength="3"
+              maxlength="160"
+              required
+            /></label
+          ><button class="button secondary">Zapisz korekty</button>
+        </form>
+        {#each character.rulings as r}<div class="panel ruling-entry">
+            <span class="eyebrow">DECYZJA MG — ZAPISANA PRZEZ GRACZA</span>
+            <h3>{r.ruling}</h3>
+            <p>{r.reason}</p>
+            <small class="muted">{new Date(r.date).toLocaleString('pl-PL')}</small>
+          </div>{/each}
+      {:else if tab === 'history'}<div class="section-heading">
+          <div>
+            <p class="eyebrow">ŚLADY NA PIASKU</p>
+            <h2>Historia zmian</h2>
+          </div>
+          <button
+            class="button secondary"
+            onclick={() => {
+              if (confirm('Cofnąć ostatnią zapisaną zmianę?')) send({ type: 'undo' });
+            }}>Cofnij ostatnią zmianę</button
+          >
+        </div>
+        <p class="muted small">
+          Cofanie obejmuje wyłącznie ostatnią zmianę. Dzięki temu późniejsze rozwinięcia nie tracą
+          swoich wymagań.
+        </p>
+        <div class="panel">
+          {#each history as event}<div class="history-row">
+              <span class="history-dot"></span><b>{labels[event.kind] || event.kind}</b><time
+                >{new Date(event.date).toLocaleString('pl-PL')}</time
+              >
+            </div>{/each}{#if !history.length}<p class="muted">
+              Historia zacznie się od pierwszej zmiany.
+            </p>{/if}
+        </div>
+        <button class="button secondary" onclick={duplicate}>Utwórz kopię jako szkic</button>
+        <button
+          class="text-button danger"
+          onclick={() => {
+            if (confirm('Przenieść postać do archiwum?')) send({ type: 'archive' });
+          }}>Przenieś do archiwum</button
+        >
+      {/if}
+    </fieldset>
+  {/if}
 </div>
