@@ -36,7 +36,7 @@
     "@sveltejs/adapter-node": "6.0.1",
     "@sveltejs/kit": "3.1.1",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "@types/pdfkit": "0.17.7",
     "@types/pngjs": "6.0.5",
     "eslint": "10.14.0",
