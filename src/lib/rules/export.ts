@@ -1,0 +1,80 @@
+import { attributes, edges, hindrances, skillInfo } from '../content/catalog';
+import { derived, rankName, totalXp, availableAdvances, traitValue } from './engine';
+import type { Character } from './model';
+export function exportView(c: Character) {
+  const d = derived(c);
+  return {
+    name: c.name,
+    appearance: c.appearance,
+    portraitId: c.portraitId,
+    description: [c.profession, c.origin, c.caste, c.age ? `Wiek: ${c.age}` : '']
+      .filter(Boolean)
+      .join(' · '),
+    ruleset: c.ruleset,
+    advancement: `${rankName(totalXp(c))} · ${totalXp(c)} PD · ${availableAdvances(c)} niewydanych rozwinięć`,
+    stats: [
+      ['Obrona', String(d.parry)],
+      ['Wytrzymałość', `${d.totalToughness} (${d.toughness} + ${d.armor} pancerza)`],
+      ['Tempo', `${d.pace} / bieganie k${d.running}`],
+      ['Charyzma', String(d.charisma)],
+    ],
+    attributes: Object.entries(attributes).map(([key, label]) => [
+      label,
+      formatDie(traitValue(d.build, key)),
+    ]),
+    skills: Object.keys(d.build.skills)
+      .sort((a, b) => (skillInfo(a)?.name || a).localeCompare(skillInfo(b)?.name || b, 'pl'))
+      .map((key) => [
+        skillInfo(key)?.name ?? key,
+        `${formatDie(traitValue(d.build, key))}${d.skillModifiers[key] ? ` (${d.skillModifiers[key] > 0 ? '+' : ''}${d.skillModifiers[key]})` : ''}`,
+      ]),
+    conditions: `Rany: ${c.conditions.wounds}/3 · Zmęczenie: ${c.conditions.fatigue}/3 · Szok: ${c.conditions.shaken ? 'tak' : 'nie'} · Fuksy: ${c.conditions.bennies}${d.incapacitated ? ' · WYELIMINOWANIE' : ''} · Kara za Rany i Zmęczenie: −${d.penalty}`,
+    edges: d.build.edges.map(
+      (e) =>
+        `${edges.find((v) => v.id === e.id)?.name}${e.target ? ` [${skillInfo(e.target)?.name || attributes[e.target as keyof typeof attributes] || c.inventory.find((i) => i.id === e.target)?.name || e.target}]` : ''}: ${edges.find((v) => v.id === e.id)?.summary}`,
+    ),
+    hindrances: d.build.hindrances.map(
+      (h) =>
+        `${hindrances.find((v) => v.id === h.id)?.name} (${h.severity === 1 ? 'drobna' : 'poważna'}): ${hindrances.find((v) => v.id === h.id)?.summary}`,
+    ),
+    inventory: c.inventory.map((i) => ({
+      name: `${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}${i.equipped ? ' [używany]' : ''}`,
+      detail: [
+        i.damage ? `Obrażenia ${i.damage}` : '',
+        i.range ? `Zasięg ${i.range}` : '',
+        i.capacity ? `Amunicja ${i.loaded}/${i.capacity}; zapas ${i.reserve}` : '',
+        i.kind === 'armor' ? `Pancerz ${i.armor}; ${i.coverage}` : '',
+        `Waga ${i.weight ?? '?'} jedn. SW / szt.`,
+        i.carried ? 'niesiony' : 'przechowywany',
+        i.notes,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    })),
+    funds: `Gotówka: ${c.cash} $ · Kredyty elektroniczne: ${c.credits}`,
+    load: `Waga: ${d.weightKnown}${d.weightUnknown ? ' + nieznana' : ''} / udźwig ${d.capacity} jedn. SW. Przeciążenie: co najmniej −${d.encumbrance}.`,
+    history: c.advances.map(
+      (a, i) =>
+        `${(c.legacy?.spent ?? 0) + i + 1}. ${a.kind === 'edge' ? edges.find((e) => e.id === a.target)?.name : a.kind === 'attribute' ? attributes[a.target as keyof typeof attributes] : skillInfo(a.target)?.name}${a.kind === 'twoSkills' ? ` + ${skillInfo(a.second)?.name}` : ''} · ${a.xp} PD${a.note ? ` · ${a.note}` : ''}`,
+    ),
+    xp: c.xp.map(
+      (e) => `${e.amount >= 0 ? '+' : ''}${e.amount} PD · ${e.note} · ${e.date.slice(0, 10)}`,
+    ),
+    background: c.background,
+    notes: c.notes,
+    motivation: c.motivation,
+    affiliation: c.affiliation,
+    rulings: c.rulings.map(
+      (r) => `${r.ruling} — ${r.reason} (${r.date.slice(0, 10)}; zapis gracza)`,
+    ),
+    adjustments: Object.values(c.adjustments).some((v) => typeof v === 'number' && v !== 0)
+      ? `Korekty MG: Obrona ${c.adjustments.parry}; Wytrzymałość ${c.adjustments.toughness}; Tempo ${c.adjustments.pace}; Charyzma ${c.adjustments.charisma}. ${c.adjustments.reason}`
+      : '',
+    legacy: c.legacy
+      ? `Podstawa istniejącej karty: ${c.legacy.xp} PD; ${c.legacy.spent} historycznych rozwinięć. ${c.legacy.reason}`
+      : '',
+  };
+}
+export function formatDie(value: number) {
+  return value > 12 ? `k12+${value - 12}` : `k${value}`;
+}

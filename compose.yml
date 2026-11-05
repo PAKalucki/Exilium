@@ -1,0 +1,28 @@
+services:
+  exilium:
+    image: ${EXILIUM_IMAGE:-pakalucki/exilium:latest}
+    build: .
+    ports:
+      - '127.0.0.1:8091:3000'
+    env_file: .env
+    environment:
+      DATABASE_PATH: /data/exilium.sqlite
+      BODY_SIZE_LIMIT: 6M
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    restart: unless-stopped
+    mem_limit: 512m
+    stop_grace_period: 25s
+    logging:
+      driver: json-file
+      options:
+        max-size: '5m'
+        max-file: '3'

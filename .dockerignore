@@ -1,0 +1,14 @@
+node_modules
+.svelte-kit
+build
+.git
+.env
+.env.*
+.aws
+.codex
+.agents
+data
+test-results
+playwright-report
+*.pdf
+*.sqlite*

@@ -1,0 +1,13 @@
+node_modules/
+.svelte-kit/
+build/
+data/
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+*.sqlite*
+*.tmp
+# Supplied local rulebooks/world references; exclude from the public repository.
+/*.pdf
