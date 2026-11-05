@@ -5,20 +5,29 @@ import { repository, DomainError } from '../../../../../lib/server/db';
 import { apiError } from '../../../../../lib/server/http';
 import { normalizePortrait, portraitBody } from '../../../../../lib/server/portraits';
 
-export function GET({ locals, params, url }: import('./$types').RequestEvent) {
+export function GET({ locals, params, url, request }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
     const record = repository().read(params.id),
       id = record.document.portraitId;
     if (!id || (url.searchParams.has('v') && url.searchParams.get('v') !== id))
       throw new DomainError(404, 'Nie znaleziono portretu.');
+    const etag = `"portrait-${id}"`;
+    const headers = {
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'private, no-cache',
+      'Content-Disposition': 'inline; filename="portrait.jpg"',
+      ETag: etag,
+      Vary: 'Cookie',
+    };
+    const matches = request.headers
+      .get('If-None-Match')
+      ?.split(',')
+      .some((tag) => tag.trim() === '*' || tag.trim().replace(/^W\//, '') === etag);
+    if (matches) return new Response(null, { status: 304, headers });
     const image = repository().portrait(record.ownerId, id);
     return new Response(new Uint8Array(image.data), {
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'no-store',
-        'Content-Disposition': 'inline; filename="portrait.jpg"',
-      },
+      headers,
     });
   } catch (e) {
     return apiError(e);

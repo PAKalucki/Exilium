@@ -1,6 +1,6 @@
 # Exilium graphics prompts
 
-Generated with the built-in image_gen tool using the imagegen skill on 5 November 2026. The selected original images are saved in static/images and used by the app. Prompts are in English for reuse; app text stays in Polish and is rendered as HTML, never baked into artwork.
+Generated with the built-in image_gen tool using the imagegen skill on 5 November 2026. The selected PNG masters are saved in static/images. The app serves compressed WebP variants from src/lib/assets through Vite-generated immutable URLs. Prompts are in English for reuse; app text stays in Polish and is rendered as HTML, never baked into artwork.
 
 The common visual direction is grounded human frontier science fiction: red sandstone, dust, two suns, repaired colony technology, solar power, water scarcity and humble practical clothing. Exclude magic, paranormal effects, aliens and nonhuman races. Use warm sand, rust, muted olive and dark green to match the app. These are game illustrations rather than screenshots of an interface.
 
@@ -43,3 +43,15 @@ An illustrated tabletop arrangement of practical Exilium frontier equipment: a r
 ```text
 A calm wide background painting of the Morze Popiołu region on Exilium: distant red sandstone plateaus, a low worn caravan trail, sparse dry vegetation, windblown dust and two suns in a hazy sky. A tiny human caravan and a modest wheeled rover are far away, leaving most of the image as soft low-detail atmosphere. Painterly ink-and-gouache texture, muted parchment sand, soft rust, olive and dark-green shadow. Keep the left half quiet enough for app text placed later in HTML. No lettering, UI, watermark, monsters, aliens, nonhuman races, magic, mystical symbols, supernatural lights or neon city.
 ```
+
+## Delivery optimization
+
+The artwork itself is unchanged. `node scripts/optimize-art.mjs` uses the installed Playwright Chromium to resize and WebP-encode the PNG masters for delivery. Run it with `PLAYWRIGHT_BROWSERS_PATH` set if using a nondefault browser installation. The generated WebP files are committed; production builds do not run the encoder or install a browser.
+
+| Delivery asset           |  Bytes | Original PNG bytes |
+| ------------------------ | -----: | -----------------: |
+| Banner, 1536 px          | 445450 |            3571021 |
+| Banner, 768 px           | 116608 |            3571021 |
+| Default portrait, 320 px |  17128 |            2748765 |
+
+Responsive banner sources choose the appropriate resolution. Imports into the app produce content-hashed URLs with immutable browser caching. Uploaded character portraits use private ETag revalidation: each request still checks the application session and the current portrait reference before returning bytes or 304.

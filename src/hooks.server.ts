@@ -30,7 +30,10 @@ export const handle: Handle = async ({ event, resolve }) => {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'same-origin');
-  if (event.locals.user || event.url.pathname.startsWith('/auth'))
+  if (
+    (event.locals.user || event.url.pathname.startsWith('/auth')) &&
+    !response.headers.has('Cache-Control')
+  )
     response.headers.set('Cache-Control', 'no-store');
   return response;
 };

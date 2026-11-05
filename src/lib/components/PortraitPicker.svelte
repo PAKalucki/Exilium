@@ -1,5 +1,6 @@
 <script lang="ts">
   import { PORTRAIT_UPLOAD_LIMIT, portraitUrl } from '../portraits';
+  import defaultPortrait from '../assets/portrait-default.webp';
   let {
     characterId,
     portraitId,
@@ -34,7 +35,8 @@
 <section class="portrait-picker" aria-label="Portret postaci">
   <img
     class:portrait-placeholder={!portraitId}
-    src={portraitId ? portraitUrl(characterId, portraitId) : '/images/portrait-default-v1.png'}
+    src={portraitId ? portraitUrl(characterId, portraitId) : defaultPortrait}
+    decoding="async"
     alt={portraitId ? 'Portret postaci' : 'Ilustracja domyślna: anonimowy podróżnik Exilium'}
     width="128"
     height="160"

@@ -3,6 +3,8 @@
   import { onMount } from 'svelte';
   import { rankName, totalXp, derived as calculateStats } from '../lib/rules/engine';
   import { portraitUrl } from '../lib/portraits';
+  import heroLarge from '../lib/assets/exilium-hero-1536.webp';
+  import heroSmall from '../lib/assets/exilium-hero-768.webp';
   let { data } = $props();
   let mounted = $state(false);
   onMount(() => {
@@ -62,7 +64,10 @@
     </div>
     <div class="frontier-art">
       <img
-        src="/images/exilium-hero-v1.png"
+        src={heroLarge}
+        srcset={`${heroSmall} 768w, ${heroLarge} 1536w`}
+        sizes="(max-width: 760px) 100vw, 50vw"
+        decoding="async"
         alt="Osada Exilium pośród czerwonych kanionów pod dwoma słońcami"
         width="1536"
         height="1024"
@@ -106,7 +111,10 @@
     </div>
     <div class="library-scene">
       <img
-        src="/images/exilium-hero-v1.png"
+        src={heroLarge}
+        srcset={`${heroSmall} 768w, ${heroLarge} 1536w`}
+        sizes="(min-width: 1200px) 1140px, 100vw"
+        decoding="async"
         alt="Pustynne pogranicze Exilium z warsztatami, karawaną i dwoma słońcami"
         width="1536"
         height="1024"

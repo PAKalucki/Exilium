@@ -240,6 +240,189 @@ test('unsaved text survives a lost connection and is saved when connection retur
   await expect(page.getByLabel('Notatki z sesji')).toHaveValue('Zapis podczas utraty połączenia.');
 });
 
+test('background autosave preserves focus, caret and edits made while a response is delayed', async ({
+  page,
+}) => {
+  await login(page);
+  await page.getByLabel('Imię nowej postaci').fill('Próba pisania');
+  await page.getByRole('button', { name: 'Stwórz postać', exact: false }).click();
+  await expect(page).toHaveURL(/\/characters\/[\w-]+$/);
+  const id = page.url().split('/').pop()!;
+  let release!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requestStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let intercepted = false;
+  await page.route(`**/api/characters/${id}`, async (route) => {
+    if (!intercepted && route.request().method() === 'POST') {
+      intercepted = true;
+      const response = await route.fetch();
+      started();
+      await gate;
+      await route.fulfill({ response });
+    } else await route.continue();
+  });
+  const name = page.getByLabel('Imię postaci', { exact: true });
+  await name.fill('Maaad ');
+  try {
+    await requestStarted;
+    await expect(name).toBeFocused();
+    await expect(name).toBeEnabled();
+    await name.pressSequentially('Mikelsen');
+    await name.evaluate((element) => (element as HTMLInputElement).setSelectionRange(3, 3));
+    await name.pressSequentially('a');
+    release();
+    await expect(page.getByRole('status')).toHaveText('Zapisano');
+    await expect(name).toHaveValue('Maaaad Mikelsen');
+    await expect(name).toBeFocused();
+    expect(await name.evaluate((element) => (element as HTMLInputElement).selectionStart)).toBe(4);
+    await expect
+      .poll(
+        async () => (await (await page.request.get(`/api/characters/${id}`)).json()).document.name,
+      )
+      .toBe('Maaaad Mikelsen');
+    await name.fill('Maaad ');
+    await expect(page.getByRole('status')).toHaveText('Zapisano');
+    await expect(name).toHaveValue('Maaad ');
+    await expect(name).toBeFocused();
+    await name.pressSequentially('Mikelsen');
+    await expect(page.getByRole('status')).toHaveText('Zapisano');
+    await page.reload();
+    await expect(page.getByLabel('Imię postaci', { exact: true })).toHaveValue('Maaad Mikelsen');
+  } finally {
+    release();
+  }
+});
+
+test('session actions wait for background profile saves and the latest typed notes', async ({
+  page,
+}) => {
+  await login(page);
+  const id = await create(page, 'Notatki bez utraty tekstu');
+  await page.getByRole('button', { name: 'Notatki', exact: true }).click();
+  let release!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requestStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let intercepted = false;
+  await page.route(`**/api/characters/${id}`, async (route) => {
+    if (
+      !intercepted &&
+      route.request().method() === 'POST' &&
+      route.request().postDataJSON()?.command?.type === 'profile'
+    ) {
+      intercepted = true;
+      const response = await route.fetch();
+      started();
+      await gate;
+      await route.fulfill({ response });
+    } else await route.continue();
+  });
+  const notes = page.getByLabel('Notatki z sesji');
+  await notes.fill('Droga przez ');
+  try {
+    await requestStarted;
+    await expect(notes).toBeFocused();
+    await notes.pressSequentially('pustkowia.');
+    await page.getByRole('button', { name: 'Karta postaci', exact: true }).click();
+    await page.getByRole('button', { name: 'Zwiększ Rany', exact: true }).click();
+    release();
+    await expect(page.getByRole('status')).toHaveText('Zapisano');
+    await expect
+      .poll(async () => {
+        const record = await (await page.request.get(`/api/characters/${id}`)).json();
+        return { notes: record.document.notes, wounds: record.document.conditions.wounds };
+      })
+      .toEqual({ notes: 'Droga przez pustkowia.', wounds: 1 });
+  } finally {
+    release();
+  }
+});
+
+test('retrying a lost text-save response preserves newer typing and deduplicates the old save', async ({
+  page,
+}) => {
+  await login(page);
+  const id = await create(page, 'Notatki po ponowieniu');
+  await page.getByRole('button', { name: 'Notatki', exact: true }).click();
+  const before = await (await page.request.get(`/api/characters/${id}`)).json();
+  let lost = false;
+  await page.route(`**/api/characters/${id}`, async (route) => {
+    if (
+      !lost &&
+      route.request().method() === 'POST' &&
+      route.request().postDataJSON()?.command?.type === 'profile'
+    ) {
+      lost = true;
+      await route.fetch();
+      await route.abort('connectionfailed');
+    } else await route.continue();
+  });
+  const notes = page.getByLabel('Notatki z sesji');
+  await notes.fill('Pierwszy zapis.');
+  await expect(page.getByRole('button', { name: 'Ponów działanie', exact: true })).toBeVisible();
+  await notes.fill('Nowszy zapis z dalszą historią.');
+  await page.getByRole('button', { name: 'Ponów działanie', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Zapisano');
+  const saved = await (await page.request.get(`/api/characters/${id}`)).json();
+  expect(saved.document.notes).toBe('Nowszy zapis z dalszą historią.');
+  expect(saved.revision).toBe(before.revision + 2);
+  await expect(notes).toHaveValue('Nowszy zapis z dalszą historią.');
+});
+
+test('an automatic refresh cannot overwrite typing that starts while the read is delayed', async ({
+  page,
+}) => {
+  await login(page);
+  await page.getByLabel('Imię nowej postaci').fill('Szkic przed odświeżeniem');
+  await page.getByRole('button', { name: 'Stwórz postać', exact: false }).click();
+  await expect(page).toHaveURL(/\/characters\/[\w-]+$/);
+  const id = page.url().split('/').pop()!;
+  let release!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requestStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let intercepted = false;
+  await page.route(`**/api/characters/${id}`, async (route) => {
+    if (!intercepted && route.request().method() === 'GET') {
+      intercepted = true;
+      const response = await route.fetch();
+      started();
+      await gate;
+      await route.fulfill({ response });
+    } else await route.continue();
+  });
+  await page.getByRole('heading', { name: 'Szkic przed odświeżeniem', exact: true }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  try {
+    await requestStarted;
+    const name = page.getByLabel('Imię postaci', { exact: true });
+    await name.fill('Nowszy tekst podczas odświeżania');
+    release();
+    await expect(page.getByRole('status')).toHaveText('Zapisano');
+    await expect(name).toHaveValue('Nowszy tekst podczas odświeżania');
+    await expect(name).toBeFocused();
+    await page.reload();
+    await expect(page.getByLabel('Imię postaci', { exact: true })).toHaveValue(
+      'Nowszy tekst podczas odświeżania',
+    );
+  } finally {
+    release();
+  }
+});
+
 test('legacy entry preserves spent advances and records a scoped GM exception during leveling', async ({
   page,
 }) => {
@@ -318,6 +501,24 @@ test('portraits are shared with signed-in readers and creation previews explain 
   const image = await page.request.get(`/api/characters/${id}/portrait`);
   expect(image.status()).toBe(200);
   expect(image.headers()['content-type']).toBe('image/jpeg');
+  expect(image.headers()['cache-control']).toBe('private, no-cache');
+  expect(image.headers()['vary']).toContain('Cookie');
+  const etag = image.headers()['etag'];
+  expect(etag).toBeTruthy();
+  const cached = await page.request.get(`/api/characters/${id}/portrait`, {
+    headers: { 'If-None-Match': etag },
+  });
+  expect(cached.status()).toBe(304);
+  expect((await cached.body()).length).toBe(0);
+  const anonymous = await browser.newContext({ baseURL: origin });
+  expect(
+    (
+      await anonymous.request.get(`/api/characters/${id}/portrait`, {
+        headers: { 'If-None-Match': etag },
+      })
+    ).status(),
+  ).toBe(401);
+  await anonymous.close();
   const before = await (await page.request.get(`/api/characters/${id}`)).json();
   const invalid = await page.request.post(`/api/characters/${id}/portrait`, {
     headers: {
@@ -337,6 +538,13 @@ test('portraits are shared with signed-in readers and creation previews explain 
   const sharedImage = await other.request.get(`/api/characters/${id}/portrait`);
   expect(sharedImage.status()).toBe(200);
   expect(await sharedImage.body()).toEqual(await image.body());
+  expect(
+    (
+      await other.request.get(`/api/characters/${id}/portrait`, {
+        headers: { 'If-None-Match': `W/${etag}` },
+      })
+    ).status(),
+  ).toBe(304);
   expect(
     (
       await other.request.post(`/api/characters/${id}/portrait`, {

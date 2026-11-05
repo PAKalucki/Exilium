@@ -48,6 +48,10 @@
     timer: ReturnType<typeof setTimeout> | undefined;
   type UploadPortrait = { type: 'portrait'; file: File };
   type ClientCommand = Command | UploadPortrait;
+  const isTextSave = (command: ClientCommand) =>
+    command.type === 'saveDraft' || command.type === 'profile';
+  let actionBusy = $state(false);
+  let inFlight: Promise<boolean> | null = null;
   let pending = $state.raw<{ revision: number; commandId: string; command: ClientCommand } | null>(
     null,
   );
@@ -78,10 +82,10 @@
   let locked = $derived(
     !data.canEdit ||
       !mounted ||
-      busy ||
+      actionBusy ||
       !online ||
       conflict ||
-      !!pending ||
+      (!!pending && !isTextSave(pending.command)) ||
       record.status === 'archived',
   );
   const labels: Record<string, string> = {
@@ -124,7 +128,10 @@
         else if (!dirty && !pending) refresh(false);
       };
     const focus = () => {
-      if (!dirty && !pending && !busy) refresh(false);
+      const editing = document.activeElement?.matches(
+        'input, textarea, select, [contenteditable="true"]',
+      );
+      if (!editing && !dirty && !pending && !busy && !actionBusy) refresh(false);
     };
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (dirty || busy || pending) {
@@ -146,12 +153,17 @@
     };
   });
   async function refresh(discard = true) {
+    if (!discard && (dirty || pending || busy || actionBusy)) return;
     if (
       discard &&
       (dirty || pending) &&
       !confirm('Odrzucić lokalne niezapisane zmiany i wczytać kartę z serwera?')
     )
       return;
+    if (discard) clearTimeout(timer);
+    const startedRevision = record.revision;
+    const startedDocument = JSON.stringify(character);
+    const startedPending = pending;
     try {
       let result: CharacterRecord;
       if (data.canEdit) {
@@ -163,9 +175,21 @@
         result = data.record;
         history = data.history;
       }
+      // A refresh started before typing or a save must not replace newer local work.
+      if (
+        record.revision !== startedRevision ||
+        JSON.stringify(character) !== startedDocument ||
+        pending !== startedPending ||
+        busy ||
+        actionBusy ||
+        (!discard && dirty)
+      )
+        return;
+      if (discard || result.revision !== startedRevision) {
+        character = clone(result.document);
+        adjustments = clone(result.document.adjustments);
+      }
       record = result;
-      character = clone(result.document);
-      adjustments = clone(result.document.adjustments);
       dirty = false;
       pending = null;
       conflict = false;
@@ -175,11 +199,17 @@
       message = (e as Error).message;
     }
   }
-  async function deliver(payload: NonNullable<typeof pending>): Promise<boolean> {
+  function deliver(payload: NonNullable<typeof pending>): Promise<boolean> {
+    if (inFlight) return inFlight;
+    inFlight = performDelivery(payload).finally(() => {
+      inFlight = null;
+    });
+    return inFlight;
+  }
+  async function performDelivery(payload: NonNullable<typeof pending>): Promise<boolean> {
     if (!data.canEdit) return false;
     busy = true;
     message = '';
-    const snapshot = JSON.stringify(character);
     try {
       const response =
         payload.command.type === 'portrait'
@@ -212,10 +242,19 @@
       }
       record = result;
       if (payload.command.type === 'saveDraft' || payload.command.type === 'profile') {
-        if (JSON.stringify(character) === snapshot) {
-          character = clone(result.document);
-          dirty = false;
-        } else changed();
+        const unchanged =
+          payload.command.type === 'saveDraft'
+            ? JSON.stringify(character) === JSON.stringify(payload.command.document)
+            : Object.entries(payload.command).every(
+                ([key, value]) =>
+                  key === 'type' ||
+                  value === undefined ||
+                  character[key as keyof Character] === value,
+              );
+        // Acknowledge the sent data without rewriting the focused input or its caret.
+        // In particular, server trimming must not remove a space between typed words.
+        if (unchanged) dirty = false;
+        else changed();
       } else {
         character = clone(result.document);
         dirty = false;
@@ -240,6 +279,7 @@
     if (!data.canEdit) return false;
     clearTimeout(timer);
     if (!dirty) return true;
+    if (inFlight) return inFlight;
     if (busy || pending || !online || conflict) return false;
     const command: Command =
       record.status === 'draft'
@@ -260,15 +300,29 @@
     pending = { revision: record.revision, commandId: crypto.randomUUID(), command };
     return deliver(pending);
   }
+  async function flush() {
+    clearTimeout(timer);
+    if (inFlight && !(await inFlight)) return false;
+    if (pending) return false;
+    while (dirty) {
+      if (!(await save())) return false;
+    }
+    return true;
+  }
   async function send(command: ClientCommand): Promise<boolean> {
-    if (!data.canEdit || busy || pending || !online || conflict) return false;
-    if (dirty && !(await save())) return false;
-    pending = {
-      revision: record.revision,
-      commandId: crypto.randomUUID(),
-      command: command.type === 'portrait' ? command : clone(command),
-    };
-    return deliver(pending);
+    if (!data.canEdit || actionBusy || !online || conflict || (pending && !inFlight)) return false;
+    actionBusy = true;
+    try {
+      if (!(await flush())) return false;
+      pending = {
+        revision: record.revision,
+        commandId: crypto.randomUUID(),
+        command: command.type === 'portrait' ? command : clone(command),
+      };
+      return await deliver(pending);
+    } finally {
+      actionBusy = false;
+    }
   }
   async function itemSave(item: Item, purchase: boolean) {
     if (await send({ type: 'item', item, purchase })) {
@@ -277,18 +331,23 @@
     }
   }
   async function duplicate() {
-    if (!data.canEdit || busy || pending || !online || conflict) return;
-    if (dirty && !(await save())) return;
-    busy = true;
+    if (!data.canEdit || actionBusy || !online || conflict || (pending && !inFlight)) return;
+    actionBusy = true;
+    let destination = '';
     try {
+      if (!(await flush())) return;
+      busy = true;
       const response = await fetch(`/api/characters/${record.id}/duplicate`, { method: 'POST' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-      window.location.assign(`/characters/${result.id}`);
+      destination = `/characters/${result.id}`;
     } catch (e) {
       message = (e as Error).message;
+    } finally {
       busy = false;
+      actionBusy = false;
     }
+    if (destination) window.location.assign(destination);
   }
   async function money() {
     if (await send({ type: 'money', currency, delta: moneyDelta, note: moneyNote })) {

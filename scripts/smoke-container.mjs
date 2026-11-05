@@ -21,7 +21,7 @@ const node = (script) =>
     const headers=new Headers(init.headers);if(!headers.has('Host'))headers.set('Host','exilium.test');
     const req=httpRequest(input,{method:init.method||'GET',headers:Object.fromEntries(headers)},res=>{
       const chunks=[];res.on('data',c=>chunks.push(c));res.on('error',reject);
-      res.on('end',()=>{const h=new Headers();for(let i=0;i<res.rawHeaders.length;i+=2)h.append(res.rawHeaders[i],res.rawHeaders[i+1]);resolve(new Response(Buffer.concat(chunks),{status:res.statusCode,headers:h}))});
+      res.on('end',()=>{const h=new Headers();for(let i=0;i<res.rawHeaders.length;i+=2)h.append(res.rawHeaders[i],res.rawHeaders[i+1]);resolve(new Response([204,205,304].includes(res.statusCode)?null:Buffer.concat(chunks),{status:res.statusCode,headers:h}))});
     });req.on('error',reject);req.end(init.body);
   });
   ${script}
@@ -134,8 +134,23 @@ try {
     'Portrait endpoint did not require authentication',
   );
   node(
-    "import {PNG} from 'pngjs';import jpeg from 'jpeg-js';import {imageSize} from 'image-size';const p=new PNG({width:2,height:3});p.data.fill(255);const decoded=PNG.sync.read(PNG.sync.write(p));const encoded=jpeg.encode(decoded,82).data;if(imageSize(encoded).height!==3||jpeg.decode(encoded).width!==2)throw Error('Portrait codecs unavailable');for(const asset of ['exilium-hero-v1.png','portrait-default-v1.png']){const r=await fetch('http://127.0.0.1:3000/images/'+asset);if(!r.ok||imageSize(new Uint8Array(await r.arrayBuffer())).type!=='png')throw Error('Missing generated art: '+asset)}",
+    "import {PNG} from 'pngjs';import jpeg from 'jpeg-js';import {imageSize} from 'image-size';const p=new PNG({width:2,height:3});p.data.fill(255);const decoded=PNG.sync.read(PNG.sync.write(p));const encoded=jpeg.encode(decoded,82).data;if(imageSize(encoded).height!==3||jpeg.decode(encoded).width!==2)throw Error('Portrait codecs unavailable')",
   );
+  node(`
+    import {readdir} from 'node:fs/promises';import {imageSize} from 'image-size';
+    const files=await readdir('build/client/_app/immutable/assets');
+    for(const [name,width,limit] of [['exilium-hero-1536',1536,500000],['exilium-hero-768',768,160000],['portrait-default',320,60000]]){
+      const file=files.find(f=>f.startsWith(name+'.')&&f.endsWith('.webp'));
+      if(!file)throw Error('Missing optimized artwork: '+name);
+      const url='http://127.0.0.1:3000/_app/immutable/assets/'+file;
+      const response=await fetch(url,{headers:{Cookie:'exilium_session=smoke-valid'}});
+      const bytes=new Uint8Array(await response.arrayBuffer());const dimensions=imageSize(bytes);
+      if(!response.ok||dimensions.type!=='webp'||dimensions.width!==width||bytes.length>limit)throw Error('Artwork delivery budget or format failed: '+name);
+      if(!response.headers.get('cache-control')?.includes('immutable'))throw Error('Artwork lacks immutable caching');
+      const cached=await fetch(url,{headers:{'If-None-Match':response.headers.get('etag')}});
+      if(cached.status!==304||(await cached.arrayBuffer()).byteLength!==0)throw Error('Artwork conditional caching failed');
+    }
+  `);
   node(
     "import {readFile} from 'node:fs/promises';const PDF=(await import('pdfkit')).default;const d=new PDF({size:'A4'});let bytes=0;d.on('data',b=>bytes+=b.length);d.on('end',()=>{if(bytes<1000)process.exit(1);console.log('PDF fonts OK')});d.font(await readFile('static/fonts/DejaVuSans.ttf')).text('Żółć Łucja Gęślą');d.end()",
   );
