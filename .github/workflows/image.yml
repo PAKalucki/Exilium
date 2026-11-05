@@ -48,8 +48,6 @@ jobs:
           load: true
           platforms: linux/amd64
           tags: exilium:ci
-          cache-from: type=gha,scope=exilium
-          cache-to: type=gha,scope=exilium,mode=max
       - name: Scan repository for secrets
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -146,8 +144,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=exilium
-          cache-to: type=gha,scope=exilium,mode=max
       - name: Record immutable deployment reference
         env:
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}

@@ -12,6 +12,8 @@ Discord credentials, guild/admin IDs, real origins and infrastructure details ar
 
 CI validates formatting/types, lints source, runs unit/integration and Chromium workflows, audits production dependencies, builds a disposable image, scans it with Trivy, and runs production smoke checks before publication. Images support Linux AMD64/ARM64. Build stages use the host platform, and a guard requires architecture-independent production dependencies; review that assumption before adding native modules.
 
+Image builds do not import or export GitHub Actions BuildKit caches. A cache upload could stall after the image was already built and prevent scanning or publication. Each build can still reuse its own local layers; separate jobs build from source and retain all validation gates.
+
 The workflow publishes semantic version, full commit SHA, branch and default-branch latest tags. Deploy the immutable manifest reference from the workflow summary. Package version, image version label, footer and health API match. A `vX.Y.Z` Git tag must match `package.json`; update package, lockfile and [changelog](../CHANGELOG.md) together.
 
 Source checks, image publication and a healthy deployment are separate outcomes. Keep operational inventories, domains, network policies, acceptance results and private commands outside this repository. Secrets, supplied references, local data and test artifacts are excluded from Git and image build context.

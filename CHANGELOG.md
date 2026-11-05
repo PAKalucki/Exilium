@@ -4,6 +4,7 @@
 
 - Allow grenade and other weapon quantities when they have no ammunition counters, in creator drafts and active-sheet purchases.
 - Keep weapons with ammunition counters separate and enforce their quantity limit in equipment forms.
+- Remove shared BuildKit cache transfers that could stall CI after a successful image build.
 
 ## 0.2.2
 
