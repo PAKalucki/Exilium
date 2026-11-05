@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, type Page, type APIRequestContext } from '@playwright/test';
 import type { Role } from '../../src/lib/access';
 export const origin = 'http://127.0.0.1:5174';
@@ -27,3 +28,7 @@ export async function resetPlayers(browser: import('@playwright/test').Browser) 
   }
   await context.close();
 }
+
+export const releaseVersion = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+).version as string;

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { newItem } from '../../src/lib/rules/model';
-import { adminLogin, promote, origin, resetPlayers } from './helpers';
+import { adminLogin, promote, origin, resetPlayers, releaseVersion } from './helpers';
 
 test('admin panel assigns roles, GM moderates player items, and player cannot approve or manage users', async ({
   page,
@@ -211,7 +211,7 @@ test('scoped tokens allow originless API use, respect roles and revocation, and 
   expect((await client.request.get('/api/diagnostics')).status()).toBe(200);
   await promote(page, user.request, 'player');
   expect((await client.request.get('/api/diagnostics')).status()).toBe(403);
-  await expect(page.locator('.app-version')).toHaveText('v0.2.0');
+  await expect(page.locator('.app-version')).toHaveText(`v${releaseVersion}`);
   await user.close();
   await client.close();
   await readOnly.close();

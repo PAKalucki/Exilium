@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Add authenticated, self-hosted Swagger UI and an OpenAPI 3.1 specification for the automation API, with scope-aware examples and bearer-only execution.
+- Disable install analytics for the Swagger build dependency.
+
 ## 0.2.0
 
 - Add Player, GM and Administrator roles, account disabling, and an audited administrator user panel.

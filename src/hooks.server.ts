@@ -25,6 +25,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       (path === '/api/me' ||
         path === '/api/health' ||
         path === '/api/diagnostics' ||
+        path === '/api/openapi.json' ||
         /^\/api\/(characters|compendium)(\/[^/]+(\/(pdf|portrait))?)?$/.test(path));
     const write = event.request.method === 'POST' && /^\/api\/compendium(\/[^/]+)?$/.test(path);
     if (
@@ -55,7 +56,10 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
   const response = await resolve(event);
   response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set(
+    'X-Frame-Options',
+    event.url.pathname === '/api-docs/ui' ? 'SAMEORIGIN' : 'DENY',
+  );
   response.headers.set('Referrer-Policy', 'same-origin');
   if (
     (event.locals.user || event.url.pathname.startsWith('/auth')) &&

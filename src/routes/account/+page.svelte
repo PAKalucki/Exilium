@@ -70,6 +70,7 @@
       <h1>Moje konto <em>i API</em></h1>
     </div>
   </div>
+  <p><a href="/api-docs">Swagger — interaktywna dokumentacja API ↗</a></p>
   <p class="notice">
     Token działa z Twoją bieżącą rolą. Odczyt respektuje prywatność kart. Zapis obejmuje kompendium;
     propozycje Gracza czekają na MG lub administratora. Token nie zmienia ról ani kont. Przechowuj

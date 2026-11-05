@@ -63,7 +63,7 @@ try {
     'DISCORD_CLIENT_ID=smoke-client',
     '-e',
     'DISCORD_CLIENT_SECRET=smoke-only-placeholder',
-    process.argv[2] || 'exilium:0.2.0',
+    process.argv[2] || 'exilium:0.2.1',
   );
   const health = () =>
     node(
@@ -156,6 +156,17 @@ try {
     if(minted.status!==201)throw Error('Production token creation failed');
     const token=await minted.json(),apiHeaders={Authorization:'Bearer '+token.token,'Content-Type':'application/json'};
     if((await fetch('http://127.0.0.1:3000/api/diagnostics',{headers:apiHeaders})).status!==200)throw Error('Production token read failed');
+    const specResponse=await fetch('http://127.0.0.1:3000/api/openapi.json',{headers:apiHeaders});
+    if(specResponse.status!==200 || (await specResponse.json()).openapi!=='3.1.0')throw Error('Production OpenAPI unavailable');
+    const docs=await fetch('http://127.0.0.1:3000/api-docs/ui',{headers});
+    if(docs.status!==200 || docs.headers.get('x-frame-options')!=='SAMEORIGIN')throw Error('Swagger frame unavailable');
+    const markup=await docs.text();
+    const script=markup.match(/<script src="([^"]+)"/)[1],css=markup.match(/<link rel="stylesheet" href="([^"]+)"/)[1];
+    for(const asset of [script,css]){
+      if(!asset.startsWith('/_app/'))throw Error('Swagger asset is not self-hosted');
+      if(!(await fetch('http://127.0.0.1:3000'+asset)).ok)throw Error('Production Swagger asset unavailable');
+    }
+
     if((await fetch('http://127.0.0.1:3000/api/users',{headers:apiHeaders})).status!==403)throw Error('Token reached user management');
     const entries=await (await fetch(root,{headers})).json();
     if(entries.length!==117)throw Error('Compendium bootstrap incomplete');
