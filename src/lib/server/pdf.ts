@@ -1,10 +1,14 @@
 import PDFDocument from 'pdfkit';
 import { resolve } from 'node:path';
-import type { Character } from '../rules/model';
+import type { Character, VisibleStats } from '../rules/model';
 import { exportView } from '../rules/export';
 
-export async function characterPdf(c: Character, portrait?: Uint8Array): Promise<Buffer> {
-  const v = exportView(c),
+export async function characterPdf(
+  c: Character,
+  portrait?: Uint8Array,
+  visibleStats?: VisibleStats,
+): Promise<Buffer> {
+  const v = exportView(c, visibleStats),
     doc = new PDFDocument({
       size: 'A4',
       margin: 46,

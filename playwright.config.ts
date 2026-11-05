@@ -21,6 +21,7 @@ export default defineConfig({
       APP_ADDITIONAL_ORIGINS: '',
       DATABASE_PATH: `/tmp/exilium-e2e-${randomUUID()}.sqlite`,
       DEV_LOGIN_ENABLED: 'true',
+      DEPLOYMENT_ADMIN_DISCORD_ID: 'dev:admin',
       DISCORD_CLIENT_ID: '',
       DISCORD_CLIENT_SECRET: '',
       DISCORD_GUILD_ID: '',

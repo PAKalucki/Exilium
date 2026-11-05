@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { repository, DomainError } from '../../../../lib/server/db';
+import { characterForViewer } from '../../../../lib/server/visibility';
 import { execute } from '../../../../lib/server/commands';
 import { readJson, apiError } from '../../../../lib/server/http';
 export function GET({ locals, params }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
-    return json(repository().read(params.id));
+    return json(characterForViewer(repository().read(params.id), locals.user));
   } catch (e) {
     return apiError(e);
   }

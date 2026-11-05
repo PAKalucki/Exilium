@@ -6,7 +6,9 @@ import { equipmentDocumentSchema } from '../../../lib/compendium';
 export function GET({ locals, url }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
-    return json(repository().equipment.list(url.searchParams.get('archived') === '1'));
+    return json(
+      repository().equipment.list(url.searchParams.get('archived') === '1', locals.user.id),
+    );
   } catch (e) {
     return apiError(e);
   }

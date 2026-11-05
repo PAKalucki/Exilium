@@ -2,6 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { beforeNavigate } from '$app/navigation';
   import type { EquipmentDocument, EquipmentRecord, EquipmentEvent } from '../../lib/compendium';
+  import { managesGame } from '../../lib/access';
   import { ruleSearch } from '../../lib/content/availability';
   import EquipmentEditor from '../../lib/components/EquipmentEditor.svelte';
   let { data } = $props();
@@ -20,7 +21,7 @@
   let entries = $state<EquipmentRecord[]>(untrack(() => data.entries));
   let search = $state(''),
     category = $state(''),
-    archived = $state(false),
+    view = $state('active'),
     limit = $state(24),
     busy = $state(false),
     error = $state(''),
@@ -44,7 +45,13 @@
     entries
       .filter(
         (e) =>
-          (archived ? e.status === 'archived' : e.status === 'active') &&
+          (view === 'archived'
+            ? e.status === 'archived'
+            : view === 'pending'
+              ? e.status === 'active' && e.approvalStatus === 'pending'
+              : view === 'rejected'
+                ? e.status === 'active' && e.approvalStatus === 'rejected'
+                : e.status === 'active' && e.approvalStatus === 'approved') &&
           (!category || e.document.category === category) &&
           ruleSearch(
             [e.document.item.name, e.document.item.notes, e.document.source].join(' '),
@@ -57,6 +64,8 @@
     update: 'Edycja wpisu',
     archive: 'Archiwizacja',
     restore: 'Przywrócenie',
+    approve: 'Zatwierdzenie',
+    reject: 'Odrzucenie',
   };
   async function refresh() {
     if (busy || pending) return;
@@ -122,7 +131,11 @@
       pending = null;
       showEditor = false;
       editing = null;
-      message = 'Zapisano zmianę kompendium.';
+      message =
+        record.approvalStatus === 'pending'
+          ? 'Zgłoszenie czeka na zatwierdzenie przez MG lub administratora.'
+          : 'Zapisano zmianę kompendium.';
+      if (record.approvalStatus === 'pending') view = 'pending';
       if (historyId === record.id) await showHistory(record);
     } catch (e) {
       error = pending
@@ -132,7 +145,7 @@
       busy = false;
     }
   }
-  function change(record: EquipmentRecord, type: 'archive' | 'restore') {
+  function change(record: EquipmentRecord, type: 'archive' | 'restore' | 'approve' | 'reject') {
     if (busy || pending || showEditor) return;
     if (
       type === 'archive' &&
@@ -141,9 +154,15 @@
       )
     )
       return;
+    const note = type === 'reject' ? prompt('Powód odrzucenia (co najmniej 3 znaki):') : null;
+    if (type === 'reject' && (!note || note.trim().length < 3)) return;
     pending = {
       url: `/api/compendium/${record.id}`,
-      body: { revision: record.revision, commandId: crypto.randomUUID(), command: { type } },
+      body: {
+        revision: record.revision,
+        commandId: crypto.randomUUID(),
+        command: type === 'reject' ? { type, note } : { type },
+      },
     };
     deliver();
   }
@@ -169,8 +188,8 @@
       <p class="eyebrow">WSPÓLNE ZASOBY DRUŻYNY</p>
       <h1>Kompendium <em>ekwipunku</em></h1>
       <p class="muted">
-        Każdy zalogowany gracz może dodawać i edytować wpisy. Zmiany są dostępne od razu w kreatorze
-        i na kartach.
+        Każdy gracz może zgłosić nowy przedmiot. MG lub administrator zatwierdza zgłoszenie, zanim
+        trafi ono do kreatora i na karty. Opublikowanym kompendium zarządzają MG i administrator.
       </p>
     </div>
     <button
@@ -219,11 +238,11 @@
       ></label
     >
     <label
-      >Widok kompendium<select
-        disabled={!mounted}
-        bind:value={archived}
-        onchange={() => (limit = 24)}
-        ><option value={false}>Dostępne wpisy</option><option value={true}>Archiwum wpisów</option
+      >Widok kompendium<select disabled={!mounted} bind:value={view} onchange={() => (limit = 24)}
+        ><option value="active">Dostępne wpisy</option><option value="pending"
+          >Oczekujące zgłoszenia</option
+        ><option value="rejected">Odrzucone zgłoszenia</option><option value="archived"
+          >Archiwum wpisów</option
         ></select
       ></label
     >
@@ -239,6 +258,10 @@
       <article class="panel catalog-card">
         <p class="eyebrow">{record.document.category}</p>
         <h2>{item.name}</h2>
+        {#if record.approvalStatus !== 'approved'}<p class="badge">
+            {record.approvalStatus === 'pending' ? 'Czeka na zatwierdzenie' : 'Odrzucono'}
+          </p>{/if}
+        {#if record.reviewNote}<p class="notice">Powód: {record.reviewNote}</p>{/if}
         <p>
           <strong>{item.price} $</strong> / szt. · Waga: {item.weight ?? 'nieustalona'} jedn. SW
         </p>
@@ -255,16 +278,26 @@
           </p>
         </details>
         <div class="card-actions">
-          <button
-            class="text-button"
-            disabled={busy || !!pending || record.status === 'archived'}
-            onclick={() => edit(record)}>Edytuj</button
-          ><button class="text-button" onclick={() => showHistory(record)}>Historia</button><button
-            class="text-button"
-            disabled={busy || !!pending || showEditor}
-            onclick={() => change(record, record.status === 'active' ? 'archive' : 'restore')}
-            >{record.status === 'active' ? 'Archiwizuj' : 'Przywróć'}</button
-          >
+          {#if managesGame(data.viewer) || (record.createdBy === data.viewer.id && record.approvalStatus !== 'approved')}<button
+              class="text-button"
+              disabled={busy || !!pending || record.status === 'archived'}
+              onclick={() => edit(record)}>Edytuj</button
+            >{/if}<button class="text-button" onclick={() => showHistory(record)}>Historia</button
+          >{#if managesGame(data.viewer) || (record.createdBy === data.viewer.id && record.approvalStatus !== 'approved' && record.status === 'active')}<button
+              class="text-button"
+              disabled={busy || !!pending || showEditor}
+              onclick={() => change(record, record.status === 'active' ? 'archive' : 'restore')}
+              >{record.status === 'active' ? 'Archiwizuj' : 'Przywróć'}</button
+            >{/if}
+          {#if managesGame(data.viewer) && record.approvalStatus === 'pending' && record.status === 'active'}<button
+              class="button primary compact"
+              disabled={busy || !!pending || showEditor}
+              onclick={() => change(record, 'approve')}>Zatwierdź</button
+            ><button
+              class="text-button"
+              disabled={busy || !!pending || showEditor}
+              onclick={() => change(record, 'reject')}>Odrzuć</button
+            >{/if}
         </div>
       </article>
     {/each}
@@ -295,6 +328,7 @@
             {event.before ? `${event.before.item.name}: ${event.before.item.price} $ → ` : ''}{event
               .after.item.name}: {event.after.item.price} $
           </p>
+          {#if event.reviewNote}<p>Powód: {event.reviewNote}</p>{/if}
           <p>Kategoria: {event.after.category} · Źródło: {event.after.source}</p>
           <p class="prose">{event.after.item.notes}</p>
         </details>{/each}

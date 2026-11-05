@@ -23,6 +23,23 @@ const server = createServer((req, res) => {
     res.end('Niedozwolony adres aplikacji.');
     return;
   }
+  // Cloudflare supplies the visitor scheme on requests carried by the tunnel.
+  // This header can only request a redirect to a configured HTTPS origin; it can
+  // never choose an OAuth callback, downgrade cookie security, or change a host.
+  if (new URL(origin).protocol === 'https:') {
+    let visitor;
+    try {
+      visitor = JSON.parse(req.headers['cf-visitor'] || 'null');
+    } catch {
+      visitor = null;
+    }
+    if (visitor?.scheme === 'http') {
+      const path = req.url?.startsWith('/') ? req.url : '/';
+      res.writeHead(308, { Location: `${origin}${path}`, 'Cache-Control': 'no-store' });
+      res.end();
+      return;
+    }
+  }
   req.headers['x-exilium-protocol'] = new URL(origin).protocol.slice(0, -1);
   handler(req, res, () => {
     res.writeHead(404);

@@ -36,7 +36,7 @@ export function GET({ locals, params, url, request }: import('./$types').Request
 export async function POST({ locals, params, request }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
-    const record = repository().get(locals.user.id, params.id);
+    const record = repository().editable(locals.user.id, params.id);
     if (record.status === 'archived')
       throw new DomainError(422, 'Zarchiwizowana postać jest tylko do odczytu.');
     const { revision, commandId } = z

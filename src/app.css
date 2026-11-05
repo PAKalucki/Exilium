@@ -382,7 +382,7 @@ label {
 .site-header nav {
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 20px;
   font-size: 10px;
 }
 .site-header nav > a {
@@ -397,7 +397,8 @@ label {
   .compact-navigation {
     display: flex;
     justify-content: center;
-    gap: 32px;
+    flex-wrap: wrap;
+    gap: 12px 24px;
     padding: 12px 20px;
     border-bottom: 1px solid var(--line);
     font-size: 12px;

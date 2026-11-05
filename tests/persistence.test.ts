@@ -84,7 +84,7 @@ describe('shared reads and creator-only transactional character storage', () => 
           commandId: crypto.randomUUID(),
           command,
         }),
-      ).toThrow('Nie znaleziono');
+      ).toThrow('Tę kartę');
     expect(repo.list(other)).toEqual([]);
     expect(repo.get(owner, id).revision).toBe(1);
     expect(repo.readHistory(id)).toHaveLength(0);

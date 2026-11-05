@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { characterSchema, itemSchema, advanceChoice } from '../rules/model';
+import { characterSchema, itemSchema, advanceChoice, privacySchema } from '../rules/model';
 import {
   derived,
   equipmentCost,
@@ -11,6 +11,7 @@ import {
 import { DomainError, type Repository } from './db';
 
 const body = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('privacy'), privacy: privacySchema }).strict(),
   z.object({ type: z.literal('saveDraft'), document: characterSchema }).strict(),
   z.object({ type: z.literal('finalize') }).strict(),
   z
@@ -134,6 +135,9 @@ export function execute(repo: Repository, owner: string, id: string, input: unkn
         record.status = 'active';
         break;
       }
+      case 'privacy':
+        c.privacy = command.privacy;
+        break;
       case 'removePortrait':
         c.portraitId = null;
         break;

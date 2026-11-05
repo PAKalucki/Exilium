@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { promote, adminLogin, resetPlayers } from './helpers';
 import { newItem } from '../../src/lib/rules/model';
 const origin = 'http://127.0.0.1:5174';
 async function login(page: Page) {
@@ -14,11 +15,11 @@ async function draft(page: Page, name: string) {
   return page.url().split('/').pop()!;
 }
 
-test('players maintain the live compendium and the creator copies current values without changing existing equipment', async ({
+test('GMs maintain the live compendium and the creator copies current values without changing existing equipment', async ({
   page,
   browser,
 }) => {
-  await login(page);
+  await adminLogin(page);
   await page.getByRole('link', { name: 'Kompendium', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Kompendium ekwipunku' })).toBeVisible();
   await page.getByLabel('Szukaj w kompendium').fill('Glock');
@@ -38,6 +39,7 @@ test('players maintain the live compendium and the creator copies current values
   await expect(page.locator('.catalog-card')).toContainText('35 $');
   const other = await browser.newContext({ baseURL: origin });
   await other.request.post('/auth/dev', { form: { player: 'b' }, headers: { Origin: origin } });
+  await promote(page, other.request, 'gm');
   const editor = await other.newPage();
   await editor.goto('/compendium');
   await editor.getByLabel('Szukaj w kompendium').fill('Apteczka podróżna');
@@ -93,7 +95,7 @@ test('players maintain the live compendium and the creator copies current values
   await expect(
     page.getByLabel('Przedmiot z kompendium').locator(`option[value="${entry.id}"]`),
   ).toHaveCount(0);
-  await editor.getByLabel('Widok kompendium').selectOption('true');
+  await editor.getByLabel('Widok kompendium').selectOption('archived');
   await editor
     .locator('.catalog-card')
     .getByRole('button', { name: 'Przywróć', exact: true })
@@ -104,7 +106,7 @@ test('players maintain the live compendium and the creator copies current values
     page.getByLabel('Przedmiot z kompendium').locator(`option[value="${entry.id}"]`),
   ).toHaveCount(1);
   await editor.setViewportSize({ width: 820, height: 1180 });
-  await editor.getByLabel('Widok kompendium').selectOption('false');
+  await editor.getByLabel('Widok kompendium').selectOption('active');
   expect(await editor.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
     false,
   );
@@ -116,7 +118,7 @@ test('compendium rejects anonymous and cross-origin access and preserves edits a
   page,
   browser,
 }) => {
-  await login(page);
+  await adminLogin(page);
   const catalogDocument = {
     category: 'Narzędzia',
     source: 'Exilium test',
@@ -157,6 +159,7 @@ test('compendium rejects anonymous and cross-origin access and preserves edits a
   await page.getByLabel('Cena za sztukę ($)').fill('60');
   const other = await browser.newContext({ baseURL: origin });
   await other.request.post('/auth/dev', { form: { player: 'b' }, headers: { Origin: origin } });
+  await promote(page, other.request, 'gm');
   const updated = await other.request.post(`/api/compendium/${record.id}`, {
     headers: { Origin: origin },
     data: {
@@ -230,4 +233,8 @@ test('custom Knowledge fields can be renamed and removed with their die and poin
   expect(
     (await (await page.request.get(`/api/characters/${id}`)).json()).document.build.skills,
   ).toEqual({ 'knowledge:Historia': 4 });
+});
+
+test.afterEach(async ({ browser }) => {
+  await resetPlayers(browser);
 });

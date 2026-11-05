@@ -11,6 +11,7 @@ import {
   type EquipmentEvent,
 } from '../compendium';
 import { DomainError } from './errors';
+import { managesGame, type Role } from '../access';
 
 const commandIdSchema = z.string().uuid();
 const revisionSchema = z.number().int().min(1);
@@ -67,6 +68,9 @@ export class EquipmentRepository {
       id: String(row.id),
       revision: Number(row.revision),
       status: row.status as EquipmentRecord['status'],
+      approvalStatus: (row.approval_status || 'approved') as EquipmentRecord['approvalStatus'],
+      reviewNote: String(row.review_note || ''),
+      createdBy: row.created_by ? String(row.created_by) : null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
       createdByName: row.creator ? String(row.creator) : 'Zestaw początkowy',
@@ -74,23 +78,43 @@ export class EquipmentRepository {
       document: equipmentDocumentSchema.parse(JSON.parse(String(row.document))),
     };
   }
-  read(id: string): EquipmentRecord {
+  private actor(id: string) {
+    const row = this.db.prepare('SELECT id,role,enabled FROM users WHERE id=?').get(id);
+    if (!row?.enabled) throw new DomainError(403, 'Konto jest wyłączone.');
+    return { id: String(row.id), role: row.role as Role };
+  }
+  private canRead(record: EquipmentRecord, actor: string) {
+    if (
+      record.approvalStatus !== 'approved' &&
+      record.createdBy !== actor &&
+      !managesGame(this.actor(actor))
+    )
+      throw new DomainError(404, 'Nie znaleziono wpisu kompendium.');
+  }
+  read(id: string, actor?: string): EquipmentRecord {
     const row = this.db.prepare(this.select + ' WHERE c.id=?').get(id);
     if (!row) throw new DomainError(404, 'Nie znaleziono wpisu kompendium.');
-    return this.record(row);
+    const record = this.record(row);
+    if (actor) this.canRead(record, actor);
+    return record;
   }
-  list(includeArchived = false): EquipmentRecord[] {
+  list(includeArchived = false, actor?: string): EquipmentRecord[] {
+    const user = actor ? this.actor(actor) : null;
     return this.db
-      .prepare(
-        this.select +
-          (includeArchived ? '' : " WHERE c.status='active'") +
-          ' ORDER BY c.name COLLATE NOCASE,c.id',
-      )
+      .prepare(this.select + ' ORDER BY c.name COLLATE NOCASE,c.id')
       .all()
-      .map((row) => this.record(row));
+      .map((row) => this.record(row))
+      .filter((record) => {
+        if (!includeArchived)
+          return record.status === 'active' && record.approvalStatus === 'approved';
+        return (
+          record.approvalStatus === 'approved' ||
+          (user && (managesGame(user) || record.createdBy === user.id))
+        );
+      });
   }
-  history(id: string): EquipmentEvent[] {
-    this.read(id);
+  history(id: string, actor?: string): EquipmentEvent[] {
+    this.read(id, actor);
     return this.db
       .prepare(
         `SELECT e.*,u.name AS actor FROM equipment_catalog_events e LEFT JOIN users u ON u.id=e.actor_id
@@ -102,6 +126,7 @@ export class EquipmentRepository {
         kind: row.kind as EquipmentEvent['kind'],
         date: String(row.date),
         actorName: row.actor ? String(row.actor) : 'Zestaw początkowy',
+        reviewNote: String(row.review_note || ''),
         before: row.before_document
           ? equipmentDocumentSchema.parse(JSON.parse(String(row.before_document)))
           : null,
@@ -110,7 +135,9 @@ export class EquipmentRepository {
   }
   private insert(id: string, doc: EquipmentDocument, actor: string | null, date: string) {
     this.db
-      .prepare('INSERT INTO equipment_catalog VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .prepare(
+        'INSERT INTO equipment_catalog(id,name,category,status,revision,created_at,updated_at,created_by,updated_by,document) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      )
       .run(
         id,
         doc.item.name,
@@ -162,6 +189,7 @@ export class EquipmentRepository {
     return this.read(String(event.item_id));
   }
   create(actor: string, commandId: string, input: unknown): EquipmentRecord {
+    const user = this.actor(actor);
     commandIdSchema.parse(commandId);
     const document = equipmentDocumentSchema.parse(input),
       digest = hash({ type: 'create', document });
@@ -172,6 +200,10 @@ export class EquipmentRepository {
         date = new Date().toISOString();
       document.item.id = id;
       this.insert(id, document, actor, date);
+      if (!managesGame(user))
+        this.db
+          .prepare("UPDATE equipment_catalog SET approval_status='pending' WHERE id=?")
+          .run(id);
       this.event(id, actor, commandId, digest, 'create', date, null, document);
       return this.read(id);
     });
@@ -183,6 +215,7 @@ export class EquipmentRepository {
     commandId: string,
     input: unknown,
   ): EquipmentRecord {
+    const user = this.actor(actor);
     commandIdSchema.parse(commandId);
     revisionSchema.parse(revision);
     const command = equipmentCommandSchema.parse(input),
@@ -190,7 +223,24 @@ export class EquipmentRepository {
     return this.transaction(() => {
       const retried = this.retry(actor, commandId, digest);
       if (retried) return retried;
-      const current = this.read(id);
+      const current = this.read(id, actor);
+      if (
+        !managesGame(user) &&
+        !(
+          current.createdBy === actor &&
+          current.approvalStatus !== 'approved' &&
+          ['update', 'archive'].includes(command.type)
+        )
+      )
+        throw new DomainError(
+          403,
+          'Zmiany opublikowanego kompendium i decyzje wymagają roli MG lub administratora.',
+        );
+      if (
+        ['approve', 'reject'].includes(command.type) &&
+        (current.approvalStatus !== 'pending' || current.status !== 'active')
+      )
+        throw new DomainError(422, 'Ten wpis nie czeka na zatwierdzenie.');
       if (current.revision !== revision)
         throw new DomainError(
           409,
@@ -204,11 +254,27 @@ export class EquipmentRepository {
         throw new DomainError(422, 'Wpis nie jest w archiwum.');
       const document = command.type === 'update' ? command.document : current.document;
       document.item.id = id;
+      const approval =
+        command.type === 'reject'
+          ? 'rejected'
+          : command.type === 'approve'
+            ? 'approved'
+            : command.type === 'update'
+              ? managesGame(user)
+                ? 'approved'
+                : 'pending'
+              : current.approvalStatus;
+      const note =
+        command.type === 'reject'
+          ? command.note
+          : ['update', 'approve'].includes(command.type)
+            ? ''
+            : current.reviewNote;
       const status = command.type === 'archive' ? 'archived' : 'active',
         date = new Date().toISOString();
       this.db
         .prepare(
-          `UPDATE equipment_catalog SET name=?,category=?,status=?,revision=revision+1,updated_at=?,updated_by=?,document=? WHERE id=? AND revision=?`,
+          `UPDATE equipment_catalog SET name=?,category=?,status=?,revision=revision+1,updated_at=?,updated_by=?,document=?,approval_status=?,review_note=? WHERE id=? AND revision=?`,
         )
         .run(
           document.item.name,
@@ -217,10 +283,18 @@ export class EquipmentRepository {
           date,
           actor,
           JSON.stringify(document),
+          approval,
+          note,
           id,
           revision,
         );
       this.event(id, actor, commandId, digest, command.type, date, current.document, document);
+      if (command.type === 'reject')
+        this.db
+          .prepare(
+            'UPDATE equipment_catalog_events SET review_note=? WHERE actor_id=? AND command_id=?',
+          )
+          .run(command.note, actor, commandId);
       return this.read(id);
     });
   }

@@ -167,12 +167,12 @@ test('signed-in players can read all sheets and exports, while only creators can
           data: { revision: baseline.revision, commandId: crypto.randomUUID(), command },
         })
       ).status(),
-    ).toBe(404);
+    ).toBe(403);
   expect(
     (
       await other.request.post(`/api/characters/${id}/duplicate`, { headers: { Origin: origin } })
     ).status(),
-  ).toBe(404);
+  ).toBe(403);
   expect(await (await other.request.get(`/api/characters/${id}`)).json()).toEqual(baseline);
   await send({ type: 'finalize' });
   await send({ type: 'xp', amount: 5, note: 'Pierwsza wspólna sesja' });
@@ -556,7 +556,7 @@ test('portraits are shared with signed-in readers and creation previews explain 
         data: portraitFixture(),
       })
     ).status(),
-  ).toBe(404);
+  ).toBe(403);
   await other.close();
   await page.getByRole('button', { name: /03Zawady|03 Zawady/ }).click();
   await page.getByLabel('Wybierz zawadę').selectOption('phobia');

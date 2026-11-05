@@ -43,6 +43,10 @@ describe('operational recovery', () => {
           r.document.appearance = 'Blizna na policzku, krótko ścięte włosy.';
         },
       );
+      const apiToken = repo.identity.createToken(user.id, 'guild', {
+        name: 'backup',
+        scopes: ['read'],
+      });
       const backup = join(dir, 'snapshot.sqlite');
       const catalogEntry = repo.equipment.create(user.id, crypto.randomUUID(), {
         category: 'Narzędzia',
@@ -62,6 +66,7 @@ describe('operational recovery', () => {
         expect(restoredCharacter.appearance).toContain('Blizna');
         expect(restored.portrait(user.id, restoredCharacter.portraitId!).width).toBe(96);
         expect(restored.session(token)).toBeNull();
+        expect(restored.identity.token(apiToken.token)).toBeNull();
         expect(restored.equipment.read(catalogEntry.id)).toMatchObject({
           status: 'archived',
           document: { item: { price: 42 } },

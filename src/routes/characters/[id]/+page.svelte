@@ -22,6 +22,7 @@
   } from '../../../lib/rules/engine';
   import type { AdvanceChoice, Character, CharacterRecord, Item } from '../../../lib/rules/model';
   import type { Command } from '../../../lib/server/commands';
+  import PrivacyControls from '../../../lib/components/PrivacyControls.svelte';
   import Creator from '../../../lib/components/Creator.svelte';
   import ItemEditor from '../../../lib/components/ItemEditor.svelte';
   import Development from '../../../lib/components/Development.svelte';
@@ -89,6 +90,7 @@
       record.status === 'archived',
   );
   const labels: Record<string, string> = {
+    privacy: 'Zmiana prywatności',
     saveDraft: 'Zapis szkicu',
     finalize: 'Zatwierdzenie postaci',
     profile: 'Notatki i historia',
@@ -408,7 +410,13 @@
         {character.caste || 'CZŁOWIEK'}
       </p>
       <h1>{character.name}</h1>
-      <p class="small muted">Twórca: {record.ownerName}{data.canEdit ? ' · Twoja karta' : ''}</p>
+      <p class="small muted">
+        Twórca: {record.ownerName}{data.isOwner
+          ? ' · Twoja karta'
+          : data.canEdit
+            ? ' · Edycja jako MG / administrator'
+            : ''}
+      </p>
       <p class="muted">
         {character.profession || 'Historia dopiero się zaczyna'}{character.motivation
           ? ` · ${character.motivation}`
@@ -451,7 +459,8 @@
     </div>{/if}
   {#if !data.canEdit}
     <div class="notice">
-      Karta jest widoczna dla wszystkich zalogowanych graczy. Edytować ją może tylko jej twórca: {record.ownerName}.
+      Karta jest widoczna dla wszystkich zalogowanych graczy. Edytować ją może jej twórca, MG lub
+      administrator. Twórca: {record.ownerName}.
       <button class="text-button" onclick={() => refresh(false)}>Odśwież kartę</button>
     </div>
     <ReadOnlyCharacter {record} {history} eventLabels={labels} />
@@ -474,6 +483,11 @@
         >Decyzje MG</button
       ><button class:current={tab === 'history'} onclick={() => (tab = 'history')}>Historia</button>
     </nav>
+    {#if tab !== 'creator' && record.status !== 'archived'}<PrivacyControls
+        privacy={character.privacy}
+        disabled={locked || busy || dirty || !!pending}
+        onchange={(privacy) => send({ type: 'privacy', privacy })}
+      />{/if}
     <fieldset class="sheet-body" disabled={locked}>
       {#if tab === 'creator'}<Creator
           bind:character

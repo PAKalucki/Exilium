@@ -1,13 +1,18 @@
 import { attributes, edges, hindrances, skillInfo } from '../content/catalog';
 import { derived, rankName, totalXp, availableAdvances, traitValue } from './engine';
-import type { Character } from './model';
-export function exportView(c: Character) {
-  const d = derived(c);
+import type { Character, VisibleStats } from './model';
+export function exportView(c: Character, visibleStats?: VisibleStats) {
+  const d = { ...derived(c), ...visibleStats };
   return {
     name: c.name,
     appearance: c.appearance,
     portraitId: c.portraitId,
-    description: [c.profession, c.origin, c.caste, c.age ? `Wiek: ${c.age}` : '']
+    description: [
+      c.profession,
+      c.privacy.origin && !c.origin ? 'Pochodzenie ukryte' : c.origin,
+      c.caste,
+      c.age ? `Wiek: ${c.age}` : '',
+    ]
       .filter(Boolean)
       .join(' · '),
     ruleset: c.ruleset,
@@ -51,8 +56,12 @@ export function exportView(c: Character) {
         .filter(Boolean)
         .join(' · '),
     })),
-    funds: `Gotówka: ${c.cash} $ · Kredyty elektroniczne: ${c.credits}`,
-    load: `Waga: ${d.weightKnown}${d.weightUnknown ? ' + nieznana' : ''} / udźwig ${d.capacity} jedn. SW. Przeciążenie: co najmniej −${d.encumbrance}.`,
+    funds: visibleStats
+      ? 'Ekwipunek i zasoby ukryte — zapytaj w grze.'
+      : `Gotówka: ${c.cash} $ · Kredyty elektroniczne: ${c.credits}`,
+    load: visibleStats
+      ? ''
+      : `Waga: ${d.weightKnown}${d.weightUnknown ? ' + nieznana' : ''} / udźwig ${d.capacity} jedn. SW. Przeciążenie: co najmniej −${d.encumbrance}.`,
     history: c.advances.map(
       (a, i) =>
         `${(c.legacy?.spent ?? 0) + i + 1}. ${a.kind === 'edge' ? edges.find((e) => e.id === a.target)?.name : a.kind === 'attribute' ? attributes[a.target as keyof typeof attributes] : skillInfo(a.target)?.name}${a.kind === 'twoSkills' ? ` + ${skillInfo(a.second)?.name}` : ''} · ${a.xp} PD${a.note ? ` · ${a.note}` : ''}`,
@@ -60,7 +69,8 @@ export function exportView(c: Character) {
     xp: c.xp.map(
       (e) => `${e.amount >= 0 ? '+' : ''}${e.amount} PD · ${e.note} · ${e.date.slice(0, 10)}`,
     ),
-    background: c.background,
+    background:
+      c.privacy.background && !c.background ? 'Historia ukryta — zapytaj w grze.' : c.background,
     notes: c.notes,
     motivation: c.motivation,
     affiliation: c.affiliation,

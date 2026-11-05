@@ -7,7 +7,10 @@ export function GET({ locals, params }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
     const catalog = repository().equipment;
-    return json({ record: catalog.read(params.id), history: catalog.history(params.id) });
+    return json({
+      record: catalog.read(params.id, locals.user.id),
+      history: catalog.history(params.id, locals.user.id),
+    });
   } catch (e) {
     return apiError(e);
   }

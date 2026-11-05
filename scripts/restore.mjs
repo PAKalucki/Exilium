@@ -16,7 +16,7 @@ export function restore(input, destination) {
     const version = source
       .prepare('SELECT MAX(version) version FROM schema_migrations')
       .get().version;
-    if (![1, 2, 3, 4].includes(version)) throw new Error('Unsupported database schema');
+    if (![1, 2, 3, 4, 5].includes(version)) throw new Error('Unsupported database schema');
     source.prepare('SELECT count(*) FROM characters').get();
   } finally {
     source.close();
@@ -27,6 +27,8 @@ export function restore(input, destination) {
   const copy = new DatabaseSync(destination);
   try {
     copy.exec('DELETE FROM auth_sessions;');
+    if (copy.prepare("SELECT 1 FROM sqlite_master WHERE name='api_tokens'").get())
+      copy.exec('DELETE FROM api_tokens;');
     if (copy.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok')
       throw new Error('Restored integrity check failed');
   } catch (e) {

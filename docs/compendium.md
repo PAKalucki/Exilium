@@ -1,6 +1,6 @@
 # Shared equipment compendium
 
-Open **Kompendium** in the main navigation. Every signed-in campaign member may add, edit, archive and restore equipment entries. Each save records its author, time and before/after values. There is no separate catalog-editor role or approval queue.
+Open **Kompendium** in the main navigation. Every signed-in campaign member may submit an equipment entry. Players edit their own pending/rejected submissions; MG/Admin approve, reject, publish, edit, archive and restore entries. Only approved active entries appear in equipment pickers. Each save records its author, time and before/after values. See [roles and API](access-and-api.md).
 
 The initial database contains **117 entries** from the supplied Polish 2015 rulebook, printed pages 55–62: travel gear, tools, clothing, food, electronics, surveillance equipment, ammunition, melee weapons, bows, firearms, energy weapons and armor. Energy weapons are explicitly present in the Exilium guide. Vehicles, mounts, fantastical weapons and military-only equipment with no numeric purchase price are omitted from this carryable-item catalog.
 
@@ -22,7 +22,7 @@ Concurrent saves use revisions: a stale edit returns a conflict instead of repla
 
 Schema migration **4** adds `equipment_catalog` and `equipment_catalog_events`. It inserts the initial catalog once, in one transaction, while retaining characters, portraits, users and sessions. The source seed in `src/lib/content/equipment-seed.ts` bootstraps new databases only. Later application starts and redeployments never overwrite edited or archived entries. Maintain the live catalog through the app.
 
-Catalog data lives in the same persistent SQLite volume as the character sheets and is included in the existing consistent snapshots. The restore helper accepts schema versions 1–4; restoring into an empty destination retains catalog records/history and clears restored login sessions. No additional service, secret, external database or Discord scope is required.
+Catalog data lives in the same persistent SQLite volume as the character sheets and is included in the existing consistent snapshots. The restore helper accepts schema versions 1–5; restoring into an empty destination retains catalog records/history and clears restored login sessions and API tokens. No additional service, secret, external database or Discord scope is required.
 
 Authenticated routes:
 
@@ -36,3 +36,5 @@ The server derives the actor from the session, validates the complete item schem
 ## Custom Knowledge fields
 
 Creator step 4 now provides **Zmień nazwę** and **Usuń Wiedzę** for custom specializations. Renaming keeps the die and updates targeted Edge references. Removal recalculates the point budget and clears affected Edge choices, which must be selected again. Empty and duplicate names are rejected. Standard system skills are not renamed through these controls.
+
+Schema migration **5** marks existing entries approved and introduces persistent roles, approval status/reasons, account audit and personal API tokens. Catalog changes remain independent of application redeployment.

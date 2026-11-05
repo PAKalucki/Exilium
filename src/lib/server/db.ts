@@ -8,15 +8,18 @@ import { RULESET } from '../content/catalog';
 import { config } from './config';
 import { DomainError } from './errors';
 import { EquipmentRepository } from './equipment';
+import { IdentityRepository, type User } from './identity';
+import { canEditCharacter } from '../access';
+export type { User } from './identity';
 export { DomainError } from './errors';
 
-export type User = { id: string; discordId: string; name: string; enabled: number };
 export type SessionUser = User & { guildId: string };
 export type PortraitImage = { data: Uint8Array; width: number; height: number };
 const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 export class Repository {
   readonly db: DatabaseSync;
   readonly equipment: EquipmentRepository;
+  readonly identity: IdentityRepository;
   constructor(filename: string) {
     if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(filename);
@@ -52,6 +55,7 @@ export class Repository {
       .prepare('INSERT OR IGNORE INTO ruleset_releases VALUES(?,?)')
       .run(RULESET, 'SW PL 2015; Exilium; 400 dollars; current-rank advancement');
     this.equipment = new EquipmentRepository(this.db);
+    this.identity = new IdentityRepository(this.db, config().adminDiscordId);
   }
   user(discordId: string, name: string): User {
     this.db
@@ -59,8 +63,9 @@ export class Repository {
         'INSERT INTO users(id,discord_id,name) VALUES(?,?,?) ON CONFLICT(discord_id) DO UPDATE SET name=excluded.name',
       )
       .run(randomUUID(), discordId, name.slice(0, 160));
+    this.identity.bootstrap();
     return this.db
-      .prepare('SELECT id,discord_id AS discordId,name,enabled FROM users WHERE discord_id=?')
+      .prepare('SELECT id,discord_id AS discordId,name,enabled,role FROM users WHERE discord_id=?')
       .get(discordId) as User;
   }
   createSession(user: User, guildId = '') {
@@ -76,7 +81,7 @@ export class Repository {
     return (
       (this.db
         .prepare(
-          'SELECT u.id,u.discord_id AS discordId,u.name,u.enabled,s.guild_id AS guildId FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.enabled=1',
+          'SELECT u.id,u.discord_id AS discordId,u.name,u.enabled,u.role,s.guild_id AS guildId FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.enabled=1',
         )
         .get(tokenHash(token), Date.now()) as SessionUser) || null
     );
@@ -121,7 +126,7 @@ export class Repository {
       .all(ownerId)
       .map((row) => this.record(row));
   }
-  // Shared reads are for authenticated routes only. Writes must continue to use get(ownerId, id).
+  // Raw records are server-only. Routes must project shared reads for the viewer.
   read(id: string): CharacterRecord {
     const row = this.db
       .prepare(
@@ -154,6 +159,13 @@ export class Repository {
       )
       .all(id) as { id: number; kind: string; date: string }[];
   }
+  editable(actorId: string, id: string): CharacterRecord {
+    const user = this.identity.user(actorId),
+      record = this.read(id);
+    if (!canEditCharacter(user, record.ownerId))
+      throw new DomainError(403, 'Tę kartę może edytować jej twórca, MG lub administrator.');
+    return record;
+  }
   mutate(
     ownerId: string,
     id: string,
@@ -164,7 +176,7 @@ export class Repository {
   ): CharacterRecord {
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const record = this.get(ownerId, id),
+      const record = this.editable(ownerId, id),
         before = JSON.stringify(record.document),
         beforeStatus = record.status;
       const hash = createHash('sha256').update(JSON.stringify(command)).digest('hex');
@@ -184,14 +196,14 @@ export class Repository {
         );
       apply(record);
       record.document = characterSchema.parse(record.document);
-      if (record.document.portraitId) this.portrait(ownerId, record.document.portraitId);
+      if (record.document.portraitId) this.portrait(record.ownerId, record.document.portraitId);
       const date = new Date().toISOString(),
         after = JSON.stringify(record.document);
       this.db
         .prepare(
           'UPDATE characters SET name=?,status=?,revision=revision+1,updated_at=?,document=? WHERE id=? AND owner_id=?',
         )
-        .run(record.document.name, record.status, date, after, id, ownerId);
+        .run(record.document.name, record.status, date, after, id, record.ownerId);
       this.db
         .prepare(
           'INSERT INTO character_events(character_id,actor_id,command_id,command_hash,kind,date,before_document,before_status,after_document) VALUES(?,?,?,?,?,?,?,?,?)',
@@ -225,7 +237,7 @@ export class Repository {
           .run(r.id, id, r.code, JSON.stringify(r)),
       );
       this.db.exec('COMMIT');
-      return this.get(ownerId, id);
+      return this.editable(ownerId, id);
     } catch (e) {
       this.db.exec('ROLLBACK');
       throw e;
@@ -267,7 +279,7 @@ export class Repository {
         const id = randomUUID();
         this.db
           .prepare('INSERT INTO portrait_images VALUES(?,?,?,?,?)')
-          .run(id, ownerId, image.data, image.width, image.height);
+          .run(id, record.ownerId, image.data, image.width, image.height);
         record.document.portraitId = id;
       },
     );

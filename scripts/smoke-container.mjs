@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 const suffix = randomUUID().slice(0, 8),
   container = `exilium-smoke-${suffix}`,
@@ -62,7 +63,7 @@ try {
     'DISCORD_CLIENT_ID=smoke-client',
     '-e',
     'DISCORD_CLIENT_SECRET=smoke-only-placeholder',
-    process.argv[2] || 'exilium:0.1.0',
+    process.argv[2] || 'exilium:0.2.0',
   );
   const health = () =>
     node(
@@ -79,8 +80,19 @@ try {
     }
   }
   assert(ready, 'Container did not become healthy');
+  const expectedRelease = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  ).version;
+  assert(
+    JSON.parse(health()).version === expectedRelease,
+    'Health version differs from package version',
+  );
+  node(`
+    const r=await fetch('http://127.0.0.1:3000/auth/discord?probe=1',{headers:{'CF-Visitor':JSON.stringify({scheme:'http'})}});
+    if(r.status!==308 || r.headers.get('location')!=='https://exilium.test/auth/discord?probe=1')throw Error('Cloudflare HTTP redirect failed');
+  `);
   const version = node(
-    "import {DatabaseSync} from 'node:sqlite';const d=new DatabaseSync('/data/exilium.sqlite');console.log(d.prepare('select sqlite_version() v').get().v);d.prepare('INSERT INTO users(id,discord_id,name) VALUES(?,?,?)').run('smoke-user','100000000000000001','Test');d.close();",
+    "import {DatabaseSync} from 'node:sqlite';const d=new DatabaseSync('/data/exilium.sqlite');console.log(d.prepare('select sqlite_version() v').get().v);d.prepare('INSERT INTO users(id,discord_id,name,role) VALUES(?,?,?,?)').run('smoke-user','100000000000000001','Test','gm');d.close();",
   );
   assert(
     Number(version.split('.')[0]) === 3 && Number(version.split('.')[1]) >= 52,
@@ -140,16 +152,23 @@ try {
     const root='http://127.0.0.1:3000/api/compendium';
     if((await fetch(root)).status!==401)throw Error('Anonymous compendium access allowed');
     const headers={Origin:'https://exilium.test','Content-Type':'application/json',Cookie:'exilium_session=catalog-smoke'};
+    const minted=await fetch('http://127.0.0.1:3000/api/tokens',{method:'POST',headers,body:JSON.stringify({name:'production-smoke',scopes:['read','compendium:write'],days:1})});
+    if(minted.status!==201)throw Error('Production token creation failed');
+    const token=await minted.json(),apiHeaders={Authorization:'Bearer '+token.token,'Content-Type':'application/json'};
+    if((await fetch('http://127.0.0.1:3000/api/diagnostics',{headers:apiHeaders})).status!==200)throw Error('Production token read failed');
+    if((await fetch('http://127.0.0.1:3000/api/users',{headers:apiHeaders})).status!==403)throw Error('Token reached user management');
     const entries=await (await fetch(root,{headers})).json();
     if(entries.length!==117)throw Error('Compendium bootstrap incomplete');
     const entry=entries.find(e=>e.document.item.name==='Glock (9mm)');
     const body={revision:entry.revision,commandId:randomUUID(),command:{type:'update',document:{...entry.document,item:{...entry.document.item,price:321}}}};
-    const changed=await fetch(root+'/'+entry.id,{method:'POST',headers,body:JSON.stringify(body)});
+    const changed=await fetch(root+'/'+entry.id,{method:'POST',headers:apiHeaders,body:JSON.stringify(body)});
     if(changed.status!==200)throw Error('Runtime compendium editing failed');
-    const retry=await fetch(root+'/'+entry.id,{method:'POST',headers,body:JSON.stringify(body)});
+    const retry=await fetch(root+'/'+entry.id,{method:'POST',headers:apiHeaders,body:JSON.stringify(body)});
     if(retry.status!==200||(await retry.json()).revision!==2)throw Error('Catalog retry was not deduplicated');
     const blocked=await fetch(root+'/'+entry.id,{method:'POST',headers:{...headers,Origin:'https://untrusted.invalid'},body:JSON.stringify(body)});
     if(blocked.status!==403)throw Error('Cross-origin catalog write accepted');
+    if((await fetch('http://127.0.0.1:3000/api/tokens/'+token.id,{method:'DELETE',headers})).status!==200)throw Error('Production token revoke failed');
+    if((await fetch(root,{headers:apiHeaders})).status!==401)throw Error('Revoked production token accepted');
   `);
   node(
     "import {PNG} from 'pngjs';import jpeg from 'jpeg-js';import {imageSize} from 'image-size';const p=new PNG({width:2,height:3});p.data.fill(255);const decoded=PNG.sync.read(PNG.sync.write(p));const encoded=jpeg.encode(decoded,82).data;if(imageSize(encoded).height!==3||jpeg.decode(encoded).width!==2)throw Error('Portrait codecs unavailable')",

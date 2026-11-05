@@ -6,7 +6,7 @@ import { effectiveBuild, rankIndex, spentAdvances, totalXp } from '../../../../.
 export function POST({ locals, params }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
-    const source = repository().get(locals.user.id, params.id),
+    const source = repository().editable(locals.user.id, params.id),
       c = structuredClone(source.document);
     if (source.status !== 'draft') {
       c.build = effectiveBuild(c) as typeof c.build;
@@ -24,6 +24,7 @@ export function POST({ locals, params }: import('./$types').RequestEvent) {
         reason: 'Kopia zapisanej postaci z zachowaniem obecnego rozwoju',
       };
     }
+    if (source.ownerId !== locals.user.id) c.portraitId = null;
     c.name = `${c.name.slice(0, 145)} — kopia`;
     c.xp = [];
     c.advances = [];

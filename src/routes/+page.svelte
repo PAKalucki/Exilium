@@ -104,7 +104,8 @@
           >
         </h1>
         <p class="muted">
-          Poznaj historie drużyny albo rozpocznij własną. Każdą kartę edytuje jej twórca.
+          Poznaj historie drużyny albo rozpocznij własną. Karty edytują ich twórcy, MG i
+          administrator.
         </p>
       </div>
       <span class="system-stamp">TYLKO LUDZIE.<br />NIEOGRANICZONE HISTORIE.</span>
@@ -136,7 +137,10 @@
     </div>
     <div class="character-grid">
       {#each characters as character}
-        {@const c = character.document}{@const d = calculateStats(c)}
+        {@const c = character.document}{@const d = {
+          ...calculateStats(c),
+          ...character.visibleStats,
+        }}
         <a class="character-card" href={`/characters/${character.id}`}
           ><div class="card-topline">
             <span class:active={character.status === 'active'} class="badge"
@@ -162,7 +166,9 @@
             <h2>{c.name}</h2>
             <p class="small muted">
               Twórca: {character.ownerName}<br />{character.canEdit
-                ? 'Twoja karta · możesz edytować'
+                ? character.isOwner
+                  ? 'Twoja karta · możesz edytować'
+                  : 'MG / administrator · możesz edytować'
                 : 'Tylko do odczytu'}
             </p>
             <span class="muted small"

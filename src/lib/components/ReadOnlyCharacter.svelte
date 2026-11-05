@@ -5,6 +5,7 @@
   import { derived as calculateStats, traitValue } from '../rules/engine';
   import { exportView, formatDie } from '../rules/export';
   import type { CharacterRecord } from '../rules/model';
+  import HiddenSection from './HiddenSection.svelte';
   import HelpPopover from './HelpPopover.svelte';
   import RuleDescription from './RuleDescription.svelte';
 
@@ -18,8 +19,8 @@
     eventLabels: Record<string, string>;
   } = $props();
   let c = $derived(record.document);
-  let d = $derived(calculateStats(c));
-  let v = $derived(exportView(c));
+  let d = $derived({ ...calculateStats(c), ...record.visibleStats });
+  let v = $derived(exportView(c, record.visibleStats));
   const kinds = { gear: 'Sprzęt', weapon: 'Broń', armor: 'Pancerz', cybernetic: 'Cybernetyka' };
   const coverage = { torso: 'tułów', head: 'głowa', arms: 'ręce', legs: 'nogi', all: 'całe ciało' };
 </script>
@@ -130,6 +131,8 @@
   <section class="panel">
     <h3>Koncepcja i Exilium</h3>
     <p>{v.description}</p>
+    {#if record.redacted?.includes('origin')}<HiddenSection label="Pochodzenie" />{/if}
+    {#if record.redacted?.includes('background')}<HiddenSection label="Historia" />{/if}
     {#if originDescriptions[c.origin]}<div class="help-heading">
         <b>Pochodzenie: {c.origin}</b><HelpPopover help={playerHelp.origin} />
       </div>
@@ -146,26 +149,29 @@
   </section>
   <section class="panel">
     <h3>Ekwipunek</h3>
-    <p>{v.funds}</p>
-    <p>{v.load}</p>
-    {#each c.inventory as item}<div class="rule-entry">
-        <h4>{item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}</h4>
-        <p>
-          {kinds[item.kind]} · {item.equipped ? 'używany' : 'nieużywany'} · {item.carried
-            ? 'niesiony'
-            : 'przechowywany'} · Cena: {item.price} $ / szt. · Waga: {item.weight ?? '?'} jedn. SW / szt.
-        </p>
-        {#if item.kind === 'weapon'}<p>
-            Obrażenia: {item.damage || '—'} · Zasięg: {item.range || '—'} · Obrona: {item.parry > 0
-              ? '+'
-              : ''}{item.parry} · Amunicja: {item.loaded}/{item.capacity}; zapas {item.reserve}
-          </p>{/if}
-        {#if item.kind === 'armor'}<p>
-            Pancerz: {item.armor} · Osłona: {coverage[item.coverage]}
-          </p>{/if}
-        {#if item.notes}<p class="prose">{item.notes}</p>{/if}
-      </div>{/each}
-    {#if !c.inventory.length}<p class="muted">Brak przedmiotów.</p>{/if}
+    {#if record.redacted?.includes('equipment')}<HiddenSection label="Ekwipunek" />{:else}
+      <p>{v.funds}</p>
+      <p>{v.load}</p>
+      {#each c.inventory as item}<div class="rule-entry">
+          <h4>{item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}</h4>
+          <p>
+            {kinds[item.kind]} · {item.equipped ? 'używany' : 'nieużywany'} · {item.carried
+              ? 'niesiony'
+              : 'przechowywany'} · Cena: {item.price} $ / szt. · Waga: {item.weight ?? '?'} jedn. SW /
+            szt.
+          </p>
+          {#if item.kind === 'weapon'}<p>
+              Obrażenia: {item.damage || '—'} · Zasięg: {item.range || '—'} · Obrona: {item.parry >
+              0
+                ? '+'
+                : ''}{item.parry} · Amunicja: {item.loaded}/{item.capacity}; zapas {item.reserve}
+            </p>{/if}
+          {#if item.kind === 'armor'}<p>
+              Pancerz: {item.armor} · Osłona: {coverage[item.coverage]}
+            </p>{/if}
+          {#if item.notes}<p class="prose">{item.notes}</p>{/if}
+        </div>{/each}
+      {#if !c.inventory.length}<p class="muted">Brak przedmiotów.</p>{/if}{/if}
   </section>
   <section class="panel">
     <div class="help-heading">

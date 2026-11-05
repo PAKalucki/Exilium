@@ -83,7 +83,7 @@ describe('private portrait uploads', () => {
       expect(() => repo.portrait(b.id, id)).toThrow('Nie znaleziono');
       expect(() =>
         repo.attachPortrait(b.id, record.id, 1, crypto.randomUUID(), 'digest', image),
-      ).toThrow('Nie znaleziono');
+      ).toThrow('Tę kartę');
       const other = repo.create(b.id, 'B', sample());
       other.document.portraitId = id;
       expect(() =>

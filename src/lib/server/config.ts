@@ -16,6 +16,7 @@ export function config() {
     clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
     guildId: (process.env.DISCORD_GUILD_ID || '').trim(),
     devLogin: process.env.DEV_LOGIN_ENABLED === 'true',
+    adminDiscordId: (process.env.DEPLOYMENT_ADMIN_DISCORD_ID || '').trim(),
   };
 }
 export function requestOrigin(url: URL): string {

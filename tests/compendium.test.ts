@@ -15,6 +15,7 @@ beforeEach(() => {
   repo = new Repository(':memory:');
   a = repo.user('100000000000000001', 'A').id;
   b = repo.user('100000000000000002', 'B').id;
+  repo.db.prepare("UPDATE users SET role='gm' WHERE id IN (?,?)").run(a, b);
 });
 afterEach(() => repo.db.close());
 describe('persistent shared equipment compendium', () => {
@@ -29,7 +30,7 @@ describe('persistent shared equipment compendium', () => {
     ).toMatchObject({ armor: 0, price: 200 });
     expect(new Set(entries.map((e) => e.document.category)).size).toBeGreaterThan(10);
   });
-  it('allows a second player to edit the entry and records who changed it', () => {
+  it('allows a second GM to edit the entry and records who changed it', () => {
     const created = repo.equipment.create(a, crypto.randomUUID(), document());
     const edited = repo.equipment.change(b, created.id, 1, crypto.randomUUID(), {
       type: 'update',
@@ -132,6 +133,11 @@ describe('persistent shared equipment compendium', () => {
       );
       stored.db.close();
       stored = new Repository(path);
+      // Simulate the already-applied role migration while recreating the old catalog.
+      stored.db.exec(
+        "ALTER TABLE equipment_catalog ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'approved'; ALTER TABLE equipment_catalog ADD COLUMN review_note TEXT NOT NULL DEFAULT '';",
+      );
+      stored.db.prepare("UPDATE users SET role='gm' WHERE id=?").run(user.id);
       expect(stored.get(user.id, character.id)).toEqual(character);
       expect(stored.session(token)?.guildId).toBe('200000000000000001');
       const seed = stored.equipment.list().find((e) => e.document.item.name === 'Plecak')!;
