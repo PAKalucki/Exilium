@@ -61,13 +61,12 @@ export function openApiDocument(version: string) {
       title: 'Exilium API',
       version,
       description:
-        'API automatyzacji Exilium. Utwórz token w Moje konto → API. Zakres read pozwala czytać, compendium:write zmienia kompendium. Bieżąca rola właściciela tokena jest sprawdzana przy każdym żądaniu. Gracz zgłasza przedmioty do zatwierdzenia przez MG/Admin. Prywatność kart obowiązuje także w API i eksportach. Publiczny host jest dostępny z Polski; klienci poza Polską mogą użyć reverse proxy. Zarządzanie kontami, rolami, tokenami i zapis kart wymaga sesji przeglądarki i nie należy do API automatyzacji.',
+        'API automatyzacji Exilium. Utwórz token w Moje konto → API. Zakres read pozwala czytać, compendium:write zmienia kompendium. Bieżąca rola właściciela tokena jest sprawdzana przy każdym żądaniu. Gracz zgłasza przedmioty do zatwierdzenia przez MG/Admin. Prywatność kart obowiązuje także w API i eksportach. Zarządzanie kontami, rolami, tokenami i zapis kart wymaga sesji przeglądarki i nie należy do API automatyzacji.',
     },
     servers: [
       {
         url: '/',
-        description:
-          'Bieżący host aplikacji (HTTPS publiczne lub reverse proxy; lokalnie również HTTP)',
+        description: 'Bieżąca instancja aplikacji',
       },
     ],
     tags: [

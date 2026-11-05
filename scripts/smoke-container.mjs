@@ -17,7 +17,7 @@ const node = (script) =>
     `
   const {request:httpRequest}=await import('node:http');
   // Node fetch strips caller-supplied Host. Exercise real HTTP with the public
-  // Host preserved, exactly as the browser/reverse proxy proxy sends it.
+  // Host preserved, exactly as the browser/reverse proxy sends it.
   globalThis.fetch=(input,init={})=>new Promise((resolve,reject)=>{
     const headers=new Headers(init.headers);if(!headers.has('Host'))headers.set('Host','exilium.test');
     const req=httpRequest(input,{method:init.method||'GET',headers:Object.fromEntries(headers)},res=>{
@@ -63,7 +63,7 @@ try {
     'DISCORD_CLIENT_ID=smoke-client',
     '-e',
     'DISCORD_CLIENT_SECRET=smoke-only-placeholder',
-    process.argv[2] || 'exilium:0.2.1',
+    process.argv[2] || 'exilium:0.2.2',
   );
   const health = () =>
     node(

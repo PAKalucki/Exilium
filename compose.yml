@@ -1,6 +1,6 @@
 services:
   exilium:
-    image: ${EXILIUM_IMAGE:-pakalucki/exilium:latest}
+    image: ${EXILIUM_IMAGE:-exilium:local}
     build: .
     ports:
       - '127.0.0.1:8091:3000'

@@ -135,7 +135,7 @@
   <p class="small muted">
     API: GET /api/me, /api/characters, /api/characters/:id, /api/health, /api/compendium,
     /api/compendium/:id. Zapis: POST /api/compendium oraz /api/compendium/:id. Użyj nagłówka
-    Authorization: Bearer TWÓJ_TOKEN. Automatyzacja może korzystać z adresu reverse proxy.
+    Authorization: Bearer TWÓJ_TOKEN. Użyj adresu bieżącej instancji aplikacji.
   </p>
 </div>
 

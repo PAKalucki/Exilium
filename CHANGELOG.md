@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Keep public source and documentation application-specific; use generic configuration examples and configurable publishing settings.
+
 ## 0.2.1
 
 - Add authenticated, self-hosted Swagger UI and an OpenAPI 3.1 specification for the automation API, with scope-aware examples and bearer-only execution.
@@ -12,7 +16,7 @@
 - Add independent privacy settings for background, origin and equipment, enforced in shared reads and exports.
 - Add scoped, expiring personal API tokens and read/compendium-write endpoints, plus GM/Admin diagnostics.
 - Show the application version in the footer and health API; publish matching Docker version tags.
-- Support public HTTPS through the dedicated Cloudflare Tunnel alongside reverse proxy and temporary LAN HTTP.
+- Support configured application origins and HTTPS redirects behind a reverse proxy.
 
 ## 0.1.0
 
