@@ -15,9 +15,11 @@
     "test:e2e": "playwright test",
     "backup": "node scripts/backup.mjs",
     "postinstall": "svelte-kit sync",
-    "format": "prettier --write src tests scripts *.ts *.json *.yml .github/workflows/*.yml README.md docs/*.md",
-    "format:check": "prettier --check src tests scripts *.ts *.json *.yml .github/workflows/*.yml README.md docs/*.md",
-    "test:container": "node scripts/smoke-container.mjs"
+    "format": "prettier --write src tests scripts *.ts *.mjs *.json *.yml .github/workflows/*.yml .github/dependabot.yml README.md docs/*.md",
+    "format:check": "prettier --check src tests scripts *.ts *.mjs *.json *.yml .github/workflows/*.yml .github/dependabot.yml README.md docs/*.md",
+    "test:container": "node scripts/smoke-container.mjs",
+    "lint": "eslint src tests scripts *.ts *.mjs --max-warnings=0",
+    "check:public-source": "node scripts/check-public-source.mjs"
   },
   "dependencies": {
     "image-size": "2.0.4",
@@ -29,6 +31,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.1",
     "@sveltejs/adapter-node": "6.0.1",
     "@sveltejs/kit": "3.1.1",
@@ -36,15 +39,22 @@
     "@types/node": "24.19.2",
     "@types/pdfkit": "0.17.7",
     "@types/pngjs": "6.0.5",
+    "eslint": "10.14.0",
+    "eslint-plugin-svelte": "3.24.0",
+    "globals": "17.14.0",
     "prettier": "3.9.10",
     "prettier-plugin-svelte": "4.1.1",
     "svelte-check": "4.7.8",
     "swagger-ui-dist": "5.34.1",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
     "vite": "8.3.6",
     "vitest": "5.1.0"
   },
   "scarfSettings": {
     "enabled": false
+  },
+  "overrides": {
+    "minimatch": "11.0.1"
   }
 }

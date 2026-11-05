@@ -34,6 +34,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: npm run format:check
       - run: npm run check
+      - run: npm run lint
+      - run: npm run check:public-source
       - run: npm test
       - run: npm audit --omit=dev
       - run: npx playwright install --with-deps chromium
@@ -48,6 +50,46 @@ jobs:
           tags: exilium:ci
           cache-from: type=gha,scope=exilium
           cache-to: type=gha,scope=exilium,mode=max
+      - name: Scan repository for secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          exit-code: '1'
+          hide-progress: true
+          skip-dirs: node_modules,.svelte-kit,test-results,build
+      - name: Record complete image vulnerability and secret report
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          skip-setup-trivy: true
+          image-ref: exilium:ci
+          scanners: vuln,secret
+          format: sarif
+          output: trivy-image.sarif
+          exit-code: '0'
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          hide-progress: true
+      - name: Reject fixable High/Critical image vulnerabilities and secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          skip-setup-trivy: true
+          image-ref: exilium:ci
+          scanners: vuln,secret
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          hide-progress: true
+      - name: Save Trivy image report
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-image-${{ github.sha }}
+          path: trivy-image.sarif
+          retention-days: 14
       - run: npm run test:container -- exilium:ci
 
   publish:
@@ -77,6 +119,10 @@ jobs:
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Enable ARM64 runtime package updates
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta

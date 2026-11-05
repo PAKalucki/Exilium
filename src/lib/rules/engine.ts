@@ -84,7 +84,7 @@ export function creationBudget(c: Character) {
   const attributeTotal = (hasHindrance(b, 'young') ? 3 : 5) + b.bonus.attributes;
   const smartsCost = Object.entries(b.skills)
     .filter(([k]) => skillInfo(k)?.attribute === 'smarts')
-    .reduce((sum, [k, v]) => sum + skillCost(v, b.attributes.smarts), 0);
+    .reduce((sum, [, v]) => sum + skillCost(v, b.attributes.smarts), 0);
   const skillSpent = Object.entries(b.skills).reduce(
     (sum, [k, v]) => sum + skillCost(v, b.attributes[skillInfo(k)!.attribute]),
     0,

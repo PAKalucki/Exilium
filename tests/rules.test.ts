@@ -200,7 +200,7 @@ describe('in-app leveling', () => {
   it('allows only one attribute increase per nonlegendary rank', () => {
     const c = sample();
     award(c, 10);
-    let p = previewAdvance(c, choice('attribute', 'agility'));
+    const p = previewAdvance(c, choice('attribute', 'agility'));
     expect(p.issues).toEqual([]);
     expect(
       previewAdvance(p.next, choice('attribute', 'strength')).issues.some((i) =>

@@ -240,13 +240,19 @@ try {
   try {
     const logs = spawnSync('docker', ['logs', '--tail', '25', container], { encoding: 'utf8' });
     console.error(logs.stdout, logs.stderr);
-  } catch {}
+  } catch {
+    /* Best-effort diagnostics and cleanup must preserve the original test failure. */
+  }
   process.exitCode = 1;
 } finally {
   try {
     docker('rm', '-f', container);
-  } catch {}
+  } catch {
+    /* Best-effort diagnostics and cleanup must preserve the original test failure. */
+  }
   try {
     docker('volume', 'rm', volume);
-  } catch {}
+  } catch {
+    /* Best-effort diagnostics and cleanup must preserve the original test failure. */
+  }
 }

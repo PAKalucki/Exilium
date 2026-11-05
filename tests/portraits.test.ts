@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { PNG } from 'pngjs';
 import jpeg from 'jpeg-js';
 import { imageSize } from 'image-size';
 import { normalizePortrait, portraitBody } from '../src/lib/server/portraits';

@@ -1,3 +1,4 @@
+import type { EquipmentRecord } from '../../src/lib/compendium';
 import { test, expect } from '@playwright/test';
 import { newItem } from '../../src/lib/rules/model';
 import { adminLogin, promote, origin, resetPlayers, releaseVersion } from './helpers';
@@ -32,11 +33,11 @@ test('admin panel assigns roles, GM moderates player items, and player cannot ap
   await editor.getByLabel('Szukaj w kompendium').fill('Wiertarka do moderacji');
   await expect(editor.locator('.catalog-card')).toContainText('Czeka na zatwierdzenie');
   const pending = (await (await player.request.get('/api/compendium?archived=1')).json()).find(
-    (r: any) => r.document.item.name === 'Wiertarka do moderacji',
+    (r: EquipmentRecord) => r.document.item.name === 'Wiertarka do moderacji',
   );
   expect(
     (await (await player.request.get('/api/compendium')).json()).some(
-      (r: any) => r.id === pending.id,
+      (r: EquipmentRecord) => r.id === pending.id,
     ),
   ).toBe(false);
   expect(

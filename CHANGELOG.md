@@ -2,7 +2,9 @@
 
 ## 0.2.2
 
-- Keep public source and documentation application-specific; use generic configuration examples and configurable publishing settings.
+- Keep public source and documentation application-specific; remove PLAN.md and retain relevant design in docs.
+- Add ESLint, Trivy repository/image gates and scan artifacts, and Dependabot updates.
+- Fix runtime image package findings and remove unused bundled package managers.
 
 ## 0.2.1
 

@@ -110,7 +110,7 @@ describe('shared reads and creator-only transactional character storage', () => 
     const c = sample();
     c.inventory.push({ ...newItem(), name: 'Sztylet', price: 25 });
     send({ type: 'saveDraft', document: c });
-    let r = send({ type: 'finalize' });
+    const r = send({ type: 'finalize' });
     expect(r.document.cash).toBe(375);
     expect(r.status).toBe('active');
     expect(() => send({ type: 'saveDraft', document: c })).toThrow('zamknięta');
@@ -146,7 +146,7 @@ describe('shared reads and creator-only transactional character storage', () => 
   it('commits XP, advances and their audit/projection rows together', () => {
     send({ type: 'finalize' });
     send({ type: 'xp', amount: 5, note: 'Sesja 1' });
-    let r = send({
+    const r = send({
       type: 'advance',
       choice: { kind: 'skill', target: 'fighting', second: '', edgeTarget: '', note: 'Trening' },
     });
