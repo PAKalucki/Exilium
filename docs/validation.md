@@ -1,6 +1,6 @@
 # Application validation
 
-The application has 100 unit/integration tests and 20 Chromium workflows. Run the commands in [README](../README.md) and inspect the matching CI result. Isolated checks do not establish the state of a hosted instance.
+The application has 101 unit/integration tests and 21 Chromium workflows. Run the commands in [README](../README.md) and inspect the matching CI result. Isolated checks do not establish the state of a hosted instance.
 
 - Rules: creation budgets, the 400-dollar default, prerequisites/exceptions, rank thresholds and advancement limits. The independent title fixture accounts for all 111 book Edges and 48 Hindrances.
 - Persistence: creator/GM permissions, audit actor identity, optimistic revisions, idempotent retries, transactional counters/money/ammunition and preservation during migrations. Grenade quantities save in drafts and purchases, while weapons with ammunition counters remain individual.

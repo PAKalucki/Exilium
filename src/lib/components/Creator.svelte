@@ -19,7 +19,6 @@
   } from '../rules/engine';
   import type { Character, Item } from '../rules/model';
   import ItemEditor from './ItemEditor.svelte';
-  import PrivacyControls from './PrivacyControls.svelte';
   import PortraitPicker from './PortraitPicker.svelte';
   import RuleDescription from './RuleDescription.svelte';
   import HelpPopover from './HelpPopover.svelte';
@@ -122,14 +121,6 @@
     onchange();
   }
 </script>
-
-<PrivacyControls
-  privacy={character.privacy}
-  onchange={(value) => {
-    character.privacy = value;
-    onchange();
-  }}
-/>
 
 <div class="creator-layout">
   <aside class="creator-steps" aria-label="Etapy tworzenia">

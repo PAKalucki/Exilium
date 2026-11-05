@@ -1,6 +1,20 @@
 <script lang="ts">
   import { hasAmmunitionCounters, type Item } from '../rules/model';
   let { draft = $bindable() }: { draft: Item } = $props();
+  function toggleAmmunition(event: Event) {
+    const checkbox = event.currentTarget as HTMLInputElement;
+    if (checkbox.checked) {
+      draft.capacity = 1;
+    } else if (
+      confirm(
+        'Wyłączyć śledzenie amunicji? Pojemność magazynka, załadowane naboje i zapas zostaną wyzerowane po zapisaniu przedmiotu.',
+      )
+    ) {
+      draft.capacity = 0;
+      draft.loaded = 0;
+      draft.reserve = 0;
+    } else checkbox.checked = true;
+  }
 </script>
 
 <div class="form-grid">
@@ -57,30 +71,6 @@
         maxlength="160"
       /></label
     ><label
-      >Pojemność magazynka<input
-        type="number"
-        bind:value={draft.capacity}
-        min="0"
-        max="10000"
-        required
-      /></label
-    ><label
-      >Załadowane naboje<input
-        type="number"
-        bind:value={draft.loaded}
-        min="0"
-        max={draft.capacity}
-        required
-      /></label
-    ><label
-      >Zapas amunicji / ogniw<input
-        type="number"
-        bind:value={draft.reserve}
-        min="0"
-        max="100000"
-        required
-      /></label
-    ><label
       >Premia do Obrony<input
         type="number"
         bind:value={draft.parry}
@@ -89,7 +79,38 @@
         required
       /></label
     >
-  </div>{/if}
+  </div>
+  <label class="check-label"
+    ><input type="checkbox" checked={hasAmmunitionCounters(draft)} onchange={toggleAmmunition} /> Broń
+    zużywa amunicję</label
+  >
+  {#if hasAmmunitionCounters(draft)}<div class="form-grid">
+      <label
+        >Pojemność magazynka<input
+          type="number"
+          bind:value={draft.capacity}
+          min="0"
+          max="10000"
+          required
+        /></label
+      ><label
+        >Załadowane naboje<input
+          type="number"
+          bind:value={draft.loaded}
+          min="0"
+          max={draft.capacity}
+          required
+        /></label
+      ><label
+        >Zapas amunicji / ogniw<input
+          type="number"
+          bind:value={draft.reserve}
+          min="0"
+          max="100000"
+          required
+        /></label
+      >
+    </div>{/if}{/if}
 {#if draft.kind === 'armor'}<div class="form-grid">
     <label
       >Pancerz podstawowy<input

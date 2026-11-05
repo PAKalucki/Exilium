@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+
+- Move character privacy controls into a dedicated Settings tab for drafts and active sheets.
+- Hide ammunition fields and counters on melee weapons, grenades and ordinary items, including shared sheets and exports; allow custom weapons to enable ammunition tracking explicitly.
+
 ## 0.2.3
 
 - Allow grenade and other weapon quantities when they have no ammunition counters, in creator drafts and active-sheet purchases.

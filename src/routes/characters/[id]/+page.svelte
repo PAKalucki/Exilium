@@ -20,7 +20,13 @@
     traitValue,
     validateCreation,
   } from '../../../lib/rules/engine';
-  import type { AdvanceChoice, Character, CharacterRecord, Item } from '../../../lib/rules/model';
+  import {
+    hasAmmunitionCounters,
+    type AdvanceChoice,
+    type Character,
+    type CharacterRecord,
+    type Item,
+  } from '../../../lib/rules/model';
   import type { Command } from '../../../lib/server/commands';
   import PrivacyControls from '../../../lib/components/PrivacyControls.svelte';
   import Creator from '../../../lib/components/Creator.svelte';
@@ -481,13 +487,11 @@
       ><button class:current={tab === 'notes'} onclick={() => (tab = 'notes')}>Notatki</button
       ><button class:current={tab === 'rulings'} onclick={() => (tab = 'rulings')}
         >Decyzje MG</button
-      ><button class:current={tab === 'history'} onclick={() => (tab = 'history')}>Historia</button>
+      ><button class:current={tab === 'history'} onclick={() => (tab = 'history')}>Historia</button
+      ><button class:current={tab === 'settings'} onclick={() => (tab = 'settings')}
+        >Ustawienia</button
+      >
     </nav>
-    {#if tab !== 'creator' && record.status !== 'archived'}<PrivacyControls
-        privacy={character.privacy}
-        disabled={locked || busy || dirty || !!pending}
-        onchange={(privacy) => send({ type: 'privacy', privacy })}
-      />{/if}
     <fieldset class="sheet-body" disabled={locked}>
       {#if tab === 'creator'}<Creator
           bind:character
@@ -797,21 +801,18 @@
               {#if item.damage}<p>
                   Obrażenia <b>{item.damage}</b> <span class="dot-separator">/</span> Zasięg {item.range ||
                     '—'}
-                </p>{/if}{#if item.kind === 'weapon' && item.capacity > 0}<div
-                  class="ammo-controls"
-                >
-                  <span>AMUNICJA <b>{item.loaded} / {item.capacity}</b></span><span
-                    >ZAPAS <b>{item.reserve}</b></span
-                  ><button
-                    class="button secondary compact"
-                    disabled={item.loaded === 0}
-                    onclick={() => send({ type: 'fire', id: item.id, rounds: 1 })}
-                    >Zużyj 1 nabój</button
-                  ><button
-                    class="button secondary compact"
-                    disabled={item.reserve === 0 || item.loaded === item.capacity}
-                    onclick={() => send({ type: 'reload', id: item.id })}>Przeładuj</button
-                  >
+                </p>{/if}{#if hasAmmunitionCounters(item)}<div class="ammo-controls">
+                  {#if item.capacity > 0}<span>AMUNICJA <b>{item.loaded} / {item.capacity}</b></span
+                    >{/if}<span>ZAPAS <b>{item.reserve}</b></span>{#if item.capacity > 0}<button
+                      class="button secondary compact"
+                      disabled={item.loaded === 0}
+                      onclick={() => send({ type: 'fire', id: item.id, rounds: 1 })}
+                      >Zużyj 1 nabój</button
+                    ><button
+                      class="button secondary compact"
+                      disabled={item.reserve === 0 || item.loaded === item.capacity}
+                      onclick={() => send({ type: 'reload', id: item.id })}>Przeładuj</button
+                    >{/if}
                 </div>{/if}
               <p class="small muted">{item.notes}</p>
               <small class="muted"
@@ -997,6 +998,17 @@
             <p>{r.reason}</p>
             <small class="muted">{new Date(r.date).toLocaleString('pl-PL')}</small>
           </div>{/each}
+      {:else if tab === 'settings'}<div class="section-heading">
+          <div>
+            <p class="eyebrow">TWOJA POSTAĆ</p>
+            <h2>Ustawienia postaci</h2>
+          </div>
+        </div>
+        <PrivacyControls
+          privacy={character.privacy}
+          disabled={locked || busy || dirty || !!pending}
+          onchange={(privacy) => send({ type: 'privacy', privacy })}
+        />
       {:else if tab === 'history'}<div class="section-heading">
           <div>
             <p class="eyebrow">ŚLADY NA PIASKU</p>

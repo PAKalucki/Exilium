@@ -93,6 +93,88 @@ async function draft(page: Page, name: string) {
   return page.url().split('/').pop()!;
 }
 
+test('ammunition controls are optional in editors and absent from melee, grenades and shared views', async ({
+  page,
+  browser,
+}) => {
+  await adminLogin(page);
+  const id = await draft(page, 'Wyposażenie bez pustych liczników');
+  const current = await (await page.request.get(`/api/characters/${id}`)).json();
+  const inventory = [
+    { ...newItem(), name: 'Sztylet do testu', kind: 'weapon', damage: 'Si+k4' },
+    { ...newItem(), name: 'Granat do testu', kind: 'weapon', damage: '3k6', quantity: 2 },
+    { ...newItem(), name: 'Rewolwer do testu', kind: 'weapon', capacity: 6, loaded: 0, reserve: 6 },
+    { ...newItem(), name: 'Plecak do testu' },
+  ];
+  expect(
+    (
+      await page.request.post(`/api/characters/${id}`, {
+        headers: { Origin: origin },
+        data: {
+          revision: current.revision,
+          commandId: crypto.randomUUID(),
+          command: {
+            type: 'saveDraft',
+            document: { ...sample(), name: current.document.name, inventory },
+          },
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  await page.reload();
+  await page.getByRole('button', { name: /^Ekwipunek/ }).click();
+  const card = (name: string) =>
+    page
+      .locator('.inventory-detail')
+      .filter({ has: page.getByRole('heading', { name, exact: true }) });
+  for (const name of ['Sztylet do testu', 'Granat do testu ×2', 'Plecak do testu'])
+    await expect(card(name).locator('.ammo-controls')).toHaveCount(0);
+  await expect(card('Rewolwer do testu').locator('.ammo-controls')).toContainText('0 / 6');
+  await card('Sztylet do testu').getByRole('button', { name: 'Edytuj', exact: true }).click();
+  await expect(page.getByLabel('Broń zużywa amunicję', { exact: true })).not.toBeChecked();
+  for (const label of ['Pojemność magazynka', 'Załadowane naboje', 'Zapas amunicji / ogniw'])
+    await expect(page.getByLabel(label, { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Anuluj', exact: true }).click();
+  await card('Rewolwer do testu').getByRole('button', { name: 'Edytuj', exact: true }).click();
+  const tracking = page.getByLabel('Broń zużywa amunicję', { exact: true });
+  await expect(tracking).toBeChecked();
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await tracking.click();
+  await expect(tracking).toBeChecked();
+  await expect(page.getByLabel('Zapas amunicji / ogniw')).toHaveValue('6');
+  page.once('dialog', (dialog) => dialog.accept());
+  await tracking.uncheck();
+  await expect(page.getByLabel('Załadowane naboje')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Anuluj', exact: true }).click();
+  await page.getByRole('button', { name: 'Dodaj przedmiot', exact: false }).click();
+  await page.getByLabel('Nazwa', { exact: true }).fill('Pusta broń własna');
+  await page
+    .getByRole('combobox', { name: 'Rodzaj przedmiotu', exact: true })
+    .selectOption('weapon');
+  await expect(page.getByLabel('Załadowane naboje')).toHaveCount(0);
+  await page.getByLabel('Broń zużywa amunicję', { exact: true }).check();
+  await page.getByLabel('Pojemność magazynka').fill('6');
+  await page.getByRole('button', { name: 'Zapisz przedmiot', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('Zapisano');
+  await page.reload();
+  await page.getByRole('button', { name: /^Ekwipunek/ }).click();
+  await expect(card('Pusta broń własna').locator('.ammo-controls')).toContainText('0 / 6');
+  const other = await browser.newContext({ baseURL: origin });
+  await other.request.post('/auth/dev', { headers: { Origin: origin }, form: { player: 'a' } });
+  await promote(page, other.request, 'player');
+  const viewer = await other.newPage();
+  await viewer.goto(`/characters/${id}`);
+  const entry = (name: string) =>
+    viewer
+      .locator('.rule-entry')
+      .filter({ has: viewer.getByRole('heading', { name, exact: true }) });
+  for (const name of ['Sztylet do testu', 'Granat do testu ×2', 'Plecak do testu'])
+    await expect(entry(name)).not.toContainText(/amunicj/i);
+  await expect(entry('Rewolwer do testu')).toContainText('Amunicja: 0/6');
+  await expect(viewer.getByRole('button', { name: 'Ustawienia', exact: true })).toHaveCount(0);
+  await other.close();
+});
+
 test('GMs maintain the live compendium and the creator copies current values without changing existing equipment', async ({
   page,
   browser,

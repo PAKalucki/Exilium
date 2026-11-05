@@ -15,6 +15,7 @@ import {
 } from '../src/lib/rules/engine';
 import { newItem, type AdvanceChoice } from '../src/lib/rules/model';
 import { sample } from './fixtures';
+import { exportView } from '../src/lib/rules/export';
 const choice = (
   kind: AdvanceChoice['kind'],
   target: string,
@@ -24,6 +25,21 @@ const choice = (
 const award = (c: ReturnType<typeof sample>, amount: number) =>
   c.xp.push({ id: crypto.randomUUID(), amount, note: 'Sesja', date: new Date().toISOString() });
 describe('2015 creation and Exilium table rules', () => {
+  it('exports ammunition only for weapons that have it, including empty magazines and reserves', () => {
+    const c = sample();
+    c.inventory = [
+      { ...newItem(), name: 'Sztylet', kind: 'weapon', damage: 'Si+k4' },
+      { ...newItem(), name: 'Granat', kind: 'weapon', damage: '3k6', quantity: 2 },
+      { ...newItem(), name: 'Skrzynka', capacity: 6 },
+      { ...newItem(), name: 'Pusty rewolwer', kind: 'weapon', capacity: 6 },
+      { ...newItem(), name: 'Broń z zapasem', kind: 'weapon', reserve: 5 },
+    ];
+    const items = exportView(c).inventory;
+    for (const item of items.slice(0, 3)) expect(item.detail).not.toMatch(/amunicj/i);
+    expect(items[3].detail).toContain('Amunicja 0/6; Zapas amunicji 0');
+    expect(items[4].detail).toContain('Zapas amunicji 5');
+    expect(items[4].detail).not.toContain('0/0');
+  });
   it('includes a negative weapon Parry modifier for an equipped two-handed weapon', () => {
     const c = sample();
     c.inventory.push({

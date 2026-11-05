@@ -2,6 +2,7 @@
   import { attributes, edges, hindrances, skillInfo } from '../content/catalog';
   import { attributeGuides, playerHelp, skillHelp } from '../content/help';
   import { originDescriptions, casteDescriptions } from '../content/setting';
+  import { hasAmmunitionCounters } from '../rules/model';
   import { derived as calculateStats, traitValue } from '../rules/engine';
   import { exportView, formatDie } from '../rules/export';
   import type { CharacterRecord } from '../rules/model';
@@ -164,7 +165,8 @@
               Obrażenia: {item.damage || '—'} · Zasięg: {item.range || '—'} · Obrona: {item.parry >
               0
                 ? '+'
-                : ''}{item.parry} · Amunicja: {item.loaded}/{item.capacity}; zapas {item.reserve}
+                : ''}{item.parry}{#if hasAmmunitionCounters(item)}{#if item.capacity > 0}
+                  · Amunicja: {item.loaded}/{item.capacity}{/if} · Zapas amunicji: {item.reserve}{/if}
             </p>{/if}
           {#if item.kind === 'armor'}<p>
               Pancerz: {item.armor} · Osłona: {coverage[item.coverage]}

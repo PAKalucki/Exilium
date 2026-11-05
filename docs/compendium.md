@@ -8,6 +8,8 @@ Book prices are a starting point for the group, not an assertion of Exilium avai
 
 Grenades and other weapons without ammunition counters can share an inventory row with a quantity greater than one. Weapons with a magazine or ammunition reserve must be added one at a time so each retains its own counters. Prices and carried weight apply per piece. Grenades are consumed manually by changing the quantity or removing the final piece.
 
+Ammunition fields appear only when a weapon has ammunition tracking. Existing magazine/reserve values enable them automatically, including an empty magazine. For a custom weapon, enable **Broń zużywa amunicję** before entering its counters. Switching tracking off asks before clearing its counters; cancelling the item edit preserves the saved weapon. Melee weapons, grenades and ordinary gear show no empty ammunition readouts on sheets or exports.
+
 ## Updating during play
 
 - Use **Dodaj wpis** for a new template or **Edytuj** for an existing one. Save explicitly with **Zapisz wpis kompendium**.

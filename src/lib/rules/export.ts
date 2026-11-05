@@ -1,6 +1,6 @@
 import { attributes, edges, hindrances, skillInfo } from '../content/catalog';
 import { derived, rankName, totalXp, availableAdvances, traitValue } from './engine';
-import type { Character, VisibleStats } from './model';
+import { hasAmmunitionCounters, type Character, type VisibleStats } from './model';
 export function exportView(c: Character, visibleStats?: VisibleStats) {
   const d = { ...derived(c), ...visibleStats };
   return {
@@ -47,7 +47,14 @@ export function exportView(c: Character, visibleStats?: VisibleStats) {
       detail: [
         i.damage ? `Obrażenia ${i.damage}` : '',
         i.range ? `Zasięg ${i.range}` : '',
-        i.capacity ? `Amunicja ${i.loaded}/${i.capacity}; zapas ${i.reserve}` : '',
+        hasAmmunitionCounters(i)
+          ? [
+              i.capacity > 0 ? `Amunicja ${i.loaded}/${i.capacity}` : '',
+              `Zapas amunicji ${i.reserve}`,
+            ]
+              .filter(Boolean)
+              .join('; ')
+          : '',
         i.kind === 'armor' ? `Pancerz ${i.armor}; ${i.coverage}` : '',
         `Waga ${i.weight ?? '?'} jedn. SW / szt.`,
         i.carried ? 'niesiony' : 'przechowywany',

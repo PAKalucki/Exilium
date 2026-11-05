@@ -106,6 +106,22 @@ test('privacy is enforced on page data, API, print, and PDF; GM can edit another
   ).toBe(200);
   const sheet = await owner.newPage();
   await sheet.goto(`/characters/${created.id}`);
+  const privacyHeading = sheet.getByRole('heading', { name: 'Prywatność postaci', exact: true });
+  await expect(privacyHeading).toHaveCount(0);
+  for (const tab of [
+    /^Karta postaci$/,
+    /^Ekwipunek/,
+    /^Rozwój/,
+    /^Notatki$/,
+    /^Decyzje MG$/,
+    /^Historia$/,
+    /^Kreator/,
+  ]) {
+    await sheet.locator('.sheet-tabs').getByRole('button', { name: tab }).click();
+    await expect(privacyHeading).toHaveCount(0);
+  }
+  await sheet.getByRole('button', { name: 'Ustawienia', exact: true }).click();
+  await expect(privacyHeading).toBeVisible();
   await sheet.getByLabel('Ukryj historię', { exact: true }).check();
   await sheet.getByLabel('Ukryj pochodzenie', { exact: true }).check();
   await sheet.getByLabel('Ukryj ekwipunek i zasoby', { exact: true }).check();

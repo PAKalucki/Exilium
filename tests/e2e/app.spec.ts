@@ -60,6 +60,7 @@ test('create, track, level up, persist, print and export a Polish character', as
   await page
     .getByRole('combobox', { name: 'Rodzaj przedmiotu', exact: true })
     .selectOption('weapon');
+  await page.getByLabel('Broń zużywa amunicję', { exact: true }).check();
   await page.getByLabel('Pojemność magazynka').fill('6');
   await page.getByLabel('Załadowane naboje').fill('2');
   await page.getByLabel('Zapas amunicji / ogniw').fill('10');

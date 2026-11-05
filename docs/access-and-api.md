@@ -17,7 +17,7 @@ The administrator uses `/users` to assign roles and enable/disable accounts afte
 
 ## Privacy
 
-The creator and sheet pages have three independent switches: **Ukryj historię**, **Ukryj pochodzenie**, and **Ukryj ekwipunek i zasoby**. All default to visible for existing and new sheets. “Historia” means the character's personal background, not the audit history of changes. Equipment hiding includes inventory, cash, credits and targeted inventory references. Combat totals remain public and are calculated from the full saved sheet before redaction.
+The **Ustawienia** tab on draft and active character sheets has three independent switches: **Ukryj historię**, **Ukryj pochodzenie**, and **Ukryj ekwipunek i zasoby**. All default to visible for existing and new sheets. “Historia” means the character's personal background, not the audit history of changes. Equipment hiding includes inventory, cash, credits and targeted inventory references. Combat totals remain public and are calculated from the full saved sheet before redaction.
 
 Other players see blurred placeholder text. The actual hidden content is removed server-side from page data, list/detail API responses, print views and PDF exports. The creator, MG and Administrator see full content. This is not CSS-only hiding. Independently written notes, motivations and rulings remain public; avoid copying a secret into another field if it should stay private.
 
