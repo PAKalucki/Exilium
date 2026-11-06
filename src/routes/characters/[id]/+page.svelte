@@ -402,15 +402,15 @@
                   : 'Zapisano'}</span
     >
   </div>
-  <div class="sheet-heading">
-    <div>
-      {#if character.portraitId}<img
-          class="sheet-portrait"
-          src={portraitUrl(record.id, character.portraitId)}
-          alt={`Portret: ${character.name}`}
-          width="78"
-          height="98"
-        />{/if}
+  <div class="sheet-heading" class:has-portrait={!!character.portraitId}>
+    {#if character.portraitId}<img
+        class="sheet-portrait"
+        src={portraitUrl(record.id, character.portraitId)}
+        alt={`Portret: ${character.name}`}
+        width="160"
+        height="200"
+      />{/if}
+    <div class="sheet-identity">
       <p class="eyebrow">
         {character.origin || 'EXILIUM'} <span class="dot-separator">/</span>
         {character.caste || 'CZŁOWIEK'}

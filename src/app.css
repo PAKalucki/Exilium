@@ -790,11 +790,17 @@ label {
   font-size: 9px;
 }
 .sheet-heading {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 25px;
+  gap: 20px 32px;
   padding: 38px 0 30px;
+}
+.sheet-heading.has-portrait {
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+}
+.sheet-identity {
+  min-width: 0;
 }
 .sheet-heading h1 {
   font-size: 49px;
@@ -1714,8 +1720,20 @@ label {
   .sheet-heading h1 {
     font-size: 41px;
   }
+  .sheet-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sheet-heading.has-portrait {
+    grid-template-columns: 144px minmax(0, 1fr);
+  }
+  .sheet-heading .sheet-portrait {
+    grid-row: span 2;
+    width: 144px;
+    height: 180px;
+    align-self: start;
+  }
   .sheet-actions {
-    max-width: 280px;
+    justify-content: flex-start;
   }
   .character-monogram {
     height: 115px;
@@ -1796,9 +1814,6 @@ label {
   }
   .sheet-heading {
     align-items: flex-start;
-  }
-  .sheet-actions {
-    max-width: 220px;
   }
   .sheet-heading h1 {
     font-size: 36px;
@@ -1996,15 +2011,22 @@ label {
     max-width: none;
   }
   .sheet-heading {
-    flex-direction: column;
-    gap: 22px;
+    gap: 16px 18px;
     padding-top: 30px;
   }
+  .sheet-heading.has-portrait {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+  .sheet-heading .sheet-portrait {
+    grid-row: auto;
+    width: 112px;
+    height: 140px;
+  }
   .sheet-heading h1 {
-    font-size: 38px;
+    font-size: clamp(30px, 7vw, 38px);
   }
   .sheet-actions {
-    max-width: none;
+    grid-column: 1 / -1;
     justify-content: flex-start;
   }
   .save-status {
@@ -2375,12 +2397,10 @@ label {
   padding: 10px;
 }
 .sheet-portrait {
-  float: left;
-  width: 78px;
-  height: 98px;
+  width: 160px;
+  height: 200px;
   object-fit: cover;
   object-position: center 35%;
-  margin-right: 20px;
   border: 3px solid var(--paper);
   outline: 1px solid var(--line);
   border-radius: 3px;
@@ -2477,11 +2497,6 @@ label {
   .portrait-file-label input {
     max-width: 100%;
     font-size: 9px;
-  }
-  .sheet-portrait {
-    width: 62px;
-    height: 80px;
-    margin-right: 14px;
   }
   .library-scene {
     height: 100px;

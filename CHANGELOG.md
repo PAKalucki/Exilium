@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.6
+
+- Enlarge character-sheet portraits and give the name its own flexible column, with responsive action placement on tablets and phones.
+
 ## 0.2.5
 
 - Keep ammunition fields and focus stable while editing temporarily blank counters on an empty gun.
