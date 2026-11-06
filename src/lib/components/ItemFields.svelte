@@ -1,15 +1,24 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { hasAmmunitionCounters, type Item } from '../rules/model';
   let { draft = $bindable() }: { draft: Item } = $props();
+  let ammunitionEnabled = $state(untrack(() => hasAmmunitionCounters(draft)));
+  $effect(() => {
+    const item = draft;
+    // Reset for a newly selected item, not for temporarily blank numeric inputs.
+    ammunitionEnabled = untrack(() => hasAmmunitionCounters(item));
+  });
   function toggleAmmunition(event: Event) {
     const checkbox = event.currentTarget as HTMLInputElement;
     if (checkbox.checked) {
+      ammunitionEnabled = true;
       draft.capacity = 1;
     } else if (
       confirm(
         'Wyłączyć śledzenie amunicji? Pojemność magazynka, załadowane naboje i zapas zostaną wyzerowane po zapisaniu przedmiotu.',
       )
     ) {
+      ammunitionEnabled = false;
       draft.capacity = 0;
       draft.loaded = 0;
       draft.reserve = 0;
@@ -29,7 +38,7 @@
       type="number"
       bind:value={draft.quantity}
       min="1"
-      max={hasAmmunitionCounters(draft) ? 1 : 10000}
+      max={draft.kind === 'weapon' && ammunitionEnabled ? 1 : 10000}
       required
     /></label
   ><label
@@ -81,10 +90,9 @@
     >
   </div>
   <label class="check-label"
-    ><input type="checkbox" checked={hasAmmunitionCounters(draft)} onchange={toggleAmmunition} /> Broń
-    zużywa amunicję</label
+    ><input type="checkbox" checked={ammunitionEnabled} onchange={toggleAmmunition} /> Broń zużywa amunicję</label
   >
-  {#if hasAmmunitionCounters(draft)}<div class="form-grid">
+  {#if ammunitionEnabled}<div class="form-grid">
       <label
         >Pojemność magazynka<input
           type="number"

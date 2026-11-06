@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5
+
+- Keep ammunition fields and focus stable while editing temporarily blank counters on an empty gun.
+
 ## 0.2.4
 
 - Move character privacy controls into a dedicated Settings tab for drafts and active sheets.

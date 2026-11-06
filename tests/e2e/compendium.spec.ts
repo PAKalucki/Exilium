@@ -153,6 +153,9 @@ test('ammunition controls are optional in editors and absent from melee, grenade
     .selectOption('weapon');
   await expect(page.getByLabel('Załadowane naboje')).toHaveCount(0);
   await page.getByLabel('Broń zużywa amunicję', { exact: true }).check();
+  await page.getByLabel('Pojemność magazynka').fill('');
+  await expect(page.getByLabel('Pojemność magazynka')).toBeVisible({ timeout: 1000 });
+  await expect(page.getByLabel('Pojemność magazynka')).toBeFocused();
   await page.getByLabel('Pojemność magazynka').fill('6');
   await page.getByRole('button', { name: 'Zapisz przedmiot', exact: true }).click();
   await expect(page.locator('.save-status')).toHaveText('Zapisano');
