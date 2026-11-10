@@ -1,4 +1,4 @@
-import { attributes, edges, hindrances, skillInfo } from '../content/catalog';
+import { attributes, edges, hindrances, skills, skillInfo } from '../content/catalog';
 import { derived, rankName, totalXp, availableAdvances, traitValue } from './engine';
 import { hasAmmunitionCounters, type Character, type VisibleStats } from './model';
 export function exportView(c: Character, visibleStats?: VisibleStats) {
@@ -17,6 +17,38 @@ export function exportView(c: Character, visibleStats?: VisibleStats) {
       .join(' · '),
     ruleset: c.ruleset,
     advancement: `${rankName(totalXp(c))} · ${totalXp(c)} PD · ${availableAdvances(c)} niewydanych rozwinięć`,
+    rank: rankName(totalXp(c)),
+    experience: totalXp(c),
+    unspentAdvances: availableAdvances(c),
+    traitGroups: Object.entries(attributes).map(([key, label]) => ({
+      label,
+      die: traitValue(d.build, key),
+      value: formatDie(traitValue(d.build, key)),
+      skills: [
+        ...skills.filter((s) => s.attribute === key),
+        ...Object.keys(d.build.skills)
+          .filter((id) => id.startsWith('knowledge:') && skillInfo(id)?.attribute === key)
+          .map((id) => skillInfo(id)!),
+      ]
+        .sort((a, b) => a.name.localeCompare(b.name, 'pl'))
+        .map((s) => ({
+          label: s.name,
+          die: traitValue(d.build, s.id),
+          value: d.build.skills[s.id] ? formatDie(traitValue(d.build, s.id)) : 'k4−2',
+          modifier: d.skillModifiers[s.id] ?? 0,
+        })),
+    })),
+    combatStats: [
+      { label: 'Tempo', value: String(d.pace), note: `bieganie k${d.running}` },
+      { label: 'Obrona', value: String(d.parry), note: '' },
+      {
+        label: 'Wytrzymałość',
+        value: String(d.totalToughness),
+        note: `${d.toughness} + ${d.armor} pancerza`,
+      },
+      { label: 'Charyzma', value: String(d.charisma), note: '' },
+    ],
+    session: { ...c.conditions, incapacitated: d.incapacitated, penalty: d.penalty },
     stats: [
       ['Obrona', String(d.parry)],
       ['Wytrzymałość', `${d.totalToughness} (${d.toughness} + ${d.armor} pancerza)`],
@@ -43,6 +75,13 @@ export function exportView(c: Character, visibleStats?: VisibleStats) {
         `${hindrances.find((v) => v.id === h.id)?.name} (${h.severity === 1 ? 'drobna' : 'poważna'}): ${hindrances.find((v) => v.id === h.id)?.summary}`,
     ),
     inventory: c.inventory.map((i) => ({
+      kind: i.kind,
+      damage: i.damage,
+      range: i.range,
+      ammunition: hasAmmunitionCounters(i) ? `${i.loaded}/${i.capacity} · zapas ${i.reserve}` : '',
+      weight: i.weight === null ? '?' : String(i.weight * i.quantity),
+      carried: i.carried,
+      notes: i.notes,
       name: `${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}${i.equipped ? ' [używany]' : ''}`,
       detail: [
         i.damage ? `Obrażenia ${i.damage}` : '',

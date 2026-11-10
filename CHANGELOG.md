@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Rebuild the A4 print sheet in landscape, inspired by the 2015 manual's character sheet, with grouped skills, dice markers, equipment tables and condition trackers. Keep narrative text and long records on continuation pages.
+- Replace separate print and PDF download buttons with one print/PDF action using the browser's print dialog.
+
 ## 0.3.0
 
 - Open character portraits in a larger, uncropped dialog, with keyboard controls and responsive sizing for owners and read-only viewers.

@@ -436,8 +436,8 @@
         class="button secondary"
         target="_blank"
         rel="noopener"
-        href={`/characters/${record.id}/print`}>Drukuj ↗</a
-      ><a class="button secondary" href={`/api/characters/${record.id}/pdf`}>Pobierz PDF ↓</a>
+        href={`/characters/${record.id}/print`}>Drukuj / PDF ↗</a
+      >
     </div>
   </div>
   {#if message}<div class="error error-bar" role="alert">

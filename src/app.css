@@ -1562,58 +1562,19 @@ label {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.print-sheet {
-  max-width: 210mm;
-  margin: 35px auto;
-  padding: 15mm;
-  background: #fff;
-  color: #1e2926;
-}
-.print-sheet h1 {
-  font-size: 36px;
-}
-.print-sheet .print-section {
-  margin-top: 25px;
-  break-inside: avoid;
-}
-.print-sheet dl {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  font-size: 11px;
-}
-.print-sheet dl > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid #ddd;
-  padding: 8px 0;
-}
-.print-sheet dt {
-  font-weight: 400;
-}
-.print-sheet dd {
-  margin: 0;
-  font-weight: 700;
-}
-.print-sheet .print-text {
-  white-space: pre-wrap;
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
 .print-toolbar {
   display: flex;
   justify-content: center;
-  gap: 15px;
-  margin: 30px 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 16px;
 }
-.print-sheet .stat-row {
+.print-toolbar p {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: center;
   font-size: 12px;
-}
-.print-sheet .print-item {
-  border-bottom: 1px solid #ddd;
-  padding: 12px 0;
-  font-size: 11px;
 }
 @media (min-width: 1600px) {
   .page-wrap {
@@ -2224,66 +2185,23 @@ label {
   .site-footer {
     margin: 45px 20px 0;
   }
-  .print-sheet {
-    padding: 20px;
-    margin: 20px;
-  }
-  .print-sheet .stat-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 @media print {
   @page {
-    size: A4;
-    margin: 14mm;
+    size: A4 landscape;
+    margin: 10mm;
   }
   .site-header,
   .site-footer,
+  .compact-navigation,
   .print-toolbar {
     display: none !important;
   }
+  html,
   body {
     background: #fff;
     color: #000;
     min-width: 0;
-  }
-  .print-sheet {
-    margin: 0;
-    padding: 0;
-    max-width: none;
-    box-shadow: none;
-  }
-  .print-sheet .stat-row {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .print-sheet .print-section {
-    break-inside: auto;
-  }
-  .print-sheet h2,
-  .print-sheet h3 {
-    break-after: avoid;
-  }
-  .print-sheet .print-item,
-  .print-sheet dl > div {
-    break-inside: avoid;
-  }
-  .print-sheet .eyebrow {
-    font-size: 8px;
-  }
-  a {
-    color: #000;
-  }
-  .print-sheet h1 {
-    font-size: 30px;
-  }
-  .print-sheet p {
-    font-size: 10px;
-  }
-  .print-sheet .stat-tile {
-    padding: 10px;
-  }
-  .print-sheet .stat-tile > strong {
-    font-size: 28px;
   }
 }
 
@@ -2512,13 +2430,6 @@ label {
   font-size: 10px;
   line-height: 1.8;
   margin: 7px 0 0;
-}
-.print-portrait {
-  float: right;
-  width: 95px;
-  height: 120px;
-  object-fit: contain;
-  margin: 0 0 20px 20px;
 }
 @media (max-width: 820px) {
   .frontier-art {

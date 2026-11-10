@@ -16,7 +16,7 @@ The local application includes:
 - Wounds, fatigue, Shaken, Fuksy, ammunition/reloading, cash and electronic credits.
 - In-app XP awards/corrections, rank changes, advancement previews, attribute/skill/Edge increases and development history.
 - Player-recorded GM rulings and explicit numeric adjustments.
-- A4 print view and downloadable PDF with embedded Polish fonts.
+- Landscape A4 character sheet inspired by the 2015 manual, with PDF saving through the browser print dialog and embedded Polish fonts.
 - Revision conflicts, retry deduplication, visible save state, latest-change undo, archiving and duplication.
 - A nonroot production container, SQLite snapshots and a restore helper.
 
