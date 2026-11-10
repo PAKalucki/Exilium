@@ -33,13 +33,13 @@
   import ItemEditor from '../../../lib/components/ItemEditor.svelte';
   import Development from '../../../lib/components/Development.svelte';
   import PortraitPicker from '../../../lib/components/PortraitPicker.svelte';
+  import PortraitViewer from '../../../lib/components/PortraitViewer.svelte';
   import HelpPopover from '../../../lib/components/HelpPopover.svelte';
   import RuleDescription from '../../../lib/components/RuleDescription.svelte';
   import ReadOnlyCharacter from '../../../lib/components/ReadOnlyCharacter.svelte';
   import { attributeGuides, playerHelp, skillHelp } from '../../../lib/content/help';
   import SettingChoice from '../../../lib/components/SettingChoice.svelte';
   import { originDescriptions, casteDescriptions } from '../../../lib/content/setting';
-  import { portraitUrl } from '../../../lib/portraits';
   let { data } = $props();
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
   let record = $state.raw<CharacterRecord>(untrack(() => data.record)),
@@ -403,12 +403,10 @@
     >
   </div>
   <div class="sheet-heading" class:has-portrait={!!character.portraitId}>
-    {#if character.portraitId}<img
-        class="sheet-portrait"
-        src={portraitUrl(record.id, character.portraitId)}
-        alt={`Portret: ${character.name}`}
-        width="160"
-        height="200"
+    {#if character.portraitId}<PortraitViewer
+        characterId={record.id}
+        portraitId={character.portraitId}
+        name={character.name}
       />{/if}
     <div class="sheet-identity">
       <p class="eyebrow">

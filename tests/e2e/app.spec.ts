@@ -497,12 +497,44 @@ test('portraits are shared with signed-in readers and creation previews explain 
   await expect(page.getByRole('status')).toHaveText('Zapisano');
   await page
     .getByLabel('Wgraj portret', { exact: true })
-    .setInputFiles({ name: 'mara.png', mimeType: 'image/png', buffer: portraitFixture() });
+    .setInputFiles({ name: 'mara.png', mimeType: 'image/png', buffer: portraitFixture(600, 900) });
   await expect(page.getByRole('img', { name: 'Portret postaci', exact: true })).toBeVisible();
   await expect(page.getByRole('status')).toHaveText('Zapisano');
   await page.reload();
   await expect(page.getByLabel('Wygląd (opcjonalnie)')).toHaveValue(/blizna/);
   await expect(page.getByRole('img', { name: 'Portret postaci', exact: true })).toBeVisible();
+  const portrait = page.getByRole('button', { name: 'Powiększ portret: Mara — portret' });
+  const viewer = page.getByRole('dialog', { name: 'Portret: Mara — portret', exact: true });
+  const closeViewer = viewer.getByRole('button', { name: 'Zamknij podgląd portretu' });
+  await expect(viewer).toBeHidden();
+  await portrait.getByRole('img').click();
+  await expect(viewer).toBeVisible();
+  const enlarged = viewer.getByRole('img');
+  await expect(enlarged).toHaveJSProperty('naturalHeight', 800);
+  expect((await enlarged.boundingBox())!.height).toBeGreaterThan(
+    (await portrait.boundingBox())!.height,
+  );
+  await expect(closeViewer).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(portrait).not.toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(closeViewer).toBeFocused();
+  await enlarged.click();
+  await expect(viewer).toBeVisible();
+  await page.screenshot({ path: 'test-results/exilium-portrait-expanded-desktop.png' });
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+  await expect(portrait).toBeFocused();
+  await portrait.press('Enter');
+  await expect(viewer).toBeVisible();
+  await closeViewer.click();
+  await expect(viewer).toBeHidden();
+  await expect(portrait).toBeFocused();
+  await portrait.press('Space');
+  await expect(viewer).toBeVisible();
+  await page.mouse.click(5, 5);
+  await expect(viewer).toBeHidden();
+  await expect(portrait).toBeFocused();
   const image = await page.request.get(`/api/characters/${id}/portrait`);
   expect(image.status()).toBe(200);
   expect(image.headers()['content-type']).toBe('image/jpeg');
@@ -558,6 +590,35 @@ test('portraits are shared with signed-in readers and creation previews explain 
       })
     ).status(),
   ).toBe(403);
+  const reader = await other.newPage();
+  await reader.goto(`/characters/${id}`);
+  await expect(reader.getByRole('status')).toHaveText('Tylko do odczytu');
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    await reader.setViewportSize(viewport);
+    await reader.getByRole('button', { name: 'Powiększ portret: Mara — portret' }).click();
+    const sharedViewer = reader.getByRole('dialog', {
+      name: 'Portret: Mara — portret',
+      exact: true,
+    });
+    await expect(sharedViewer).toBeVisible();
+    await expect(sharedViewer.getByRole('img')).toHaveJSProperty('naturalHeight', 800);
+    const bounds = (await sharedViewer.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.y).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+    expect(
+      await sharedViewer.evaluate((element) => element.scrollWidth > element.clientWidth),
+    ).toBe(false);
+    await reader.screenshot({
+      path: `test-results/exilium-portrait-expanded-${viewport.width}.png`,
+    });
+    await sharedViewer.getByRole('button', { name: 'Zamknij podgląd portretu' }).click();
+    await expect(sharedViewer).toBeHidden();
+  }
   await other.close();
   await page.getByRole('button', { name: /03Zawady|03 Zawady/ }).click();
   await page.getByLabel('Wybierz zawadę').selectOption('phobia');
@@ -589,6 +650,7 @@ test('portraits are shared with signed-in readers and creation previews explain 
   await page.screenshot({ path: 'test-results/exilium-portrait-creator.png', fullPage: true });
   await page.getByRole('button', { name: 'Usuń portret', exact: true }).click();
   await expect(page.getByRole('img', { name: 'Portret postaci', exact: true })).toHaveCount(0);
+  await expect(portrait).toHaveCount(0);
   expect((await page.request.get(`/api/characters/${id}/portrait`)).status()).toBe(404);
   expect(errors).toEqual([]);
 });

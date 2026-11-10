@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Open character portraits in a larger, uncropped dialog, with keyboard controls and responsive sizing for owners and read-only viewers.
+
 ## 0.2.6
 
 - Enlarge character-sheet portraits and give the name its own flexible column, with responsive action placement on tablets and phones.
