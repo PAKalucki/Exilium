@@ -15,6 +15,12 @@ Every new Discord guild member signs in as **Gracz** (`player`). `DEPLOYMENT_ADM
 
 The administrator uses `/users` to assign roles and enable/disable accounts after the person has signed in once. Changes are audited. A stale account change is rejected. The last active administrator cannot be disabled or demoted. Disabling an account invalidates its sessions and personal API tokens. Roles are read from the database for each session/token request, so changing a role also changes existing sessions and tokens immediately. GM edits retain the sheet's creator and record the GM's own actor ID.
 
+## Archiving characters
+
+Editors can choose **Archiwizuj** on a character card, **Archiwizuj postać** in the sheet header, or **Ustawienia → Zarządzanie postacią**. Archiving asks for confirmation and saves pending sheet edits first. The character leaves the current list, with its full document and change history retained. The creator filter also applies to the **Archiwum** view.
+
+Archived cards and sheet headers offer **Przywróć postać**; Settings also offers restoration even while the rest of an archived sheet is read-only. Restoration returns a draft to draft status and a finalized character to active status. Only the creator, MG or Admin can archive/restore; an Admin must first reveal another person's private sheet. Ordinary readers have no management controls or mutation permission.
+
 ## Privacy
 
 The **Ustawienia** tab on draft and active character sheets has four independent switches: **Ukryj statystyki**, **Ukryj historię**, **Ukryj pochodzenie**, and **Ukryj ekwipunek i zasoby**. All default to visible for new sheets. Existing privacy choices are preserved and statistics remain visible until explicitly hidden. “Historia” means the character's personal background. Statistics hiding covers attributes, skills, combat values, Edges, Hindrances, session conditions, XP, advances, legacy baselines and GM rulings/adjustments; change history is also omitted from that shared view. Equipment hiding includes inventory, cash, credits and targeted inventory references. When statistics remain public, combat totals are calculated from the full saved sheet before equipment redaction. Hiding statistics leaves independently public equipment and background visible, but omits carrying capacity and encumbrance that could disclose private traits.

@@ -97,6 +97,9 @@
       (!!pending && !isTextSave(pending.command)) ||
       record.status === 'archived',
   );
+  let managementLocked = $derived(
+    !data.canEdit || !mounted || busy || actionBusy || !online || conflict || !!pending,
+  );
   const labels: Record<string, string> = {
     privacy: 'Zmiana prywatności',
     saveDraft: 'Zapis szkicu',
@@ -396,6 +399,15 @@
     rulingCode = code;
     tab = 'rulings';
   }
+  function archive() {
+    if (managementLocked) return;
+    if (
+      confirm(
+        `Przenieść „${character.name}” do archiwum? Postać zniknie z bieżącej listy. Przywrócisz ją w zakładce Archiwum.`,
+      )
+    )
+      send({ type: 'archive' });
+  }
 </script>
 
 <svelte:head><title>{character.name} · Exilium</title></svelte:head>
@@ -446,7 +458,9 @@
       </p>
     </div>
     <div class="sheet-actions">
-      {#if record.status === 'draft'}<span class="badge">SZKIC</span>{#if data.canEdit}<button
+      {#if record.status === 'archived'}<span class="badge">ARCHIWUM</span
+        >{:else if record.status === 'draft'}<span class="badge">SZKIC</span
+        >{#if data.canEdit}<button
             class="button primary"
             disabled={locked}
             onclick={() => send({ type: 'finalize' })}>Zatwierdź postać →</button
@@ -458,6 +472,16 @@
         rel="noopener"
         href={`/characters/${record.id}/print${revealQuery}`}>Drukuj / PDF ↗</a
       >
+      {#if data.canEdit}
+        {#if record.status === 'archived'}<button
+            class="button primary"
+            disabled={managementLocked}
+            onclick={() => send({ type: 'restore' })}>Przywróć postać</button
+          >
+        {:else}<button class="button secondary" disabled={managementLocked} onclick={archive}
+            >Archiwizuj postać</button
+          >{/if}
+      {/if}
     </div>
   </div>
   {#if data.canRevealPrivate}
@@ -494,11 +518,7 @@
       </div>
     </div>{/if}
   {#if record.status === 'archived'}<div class="notice">
-      Ta postać jest w archiwum. {#if data.canEdit}<button
-          class="text-button"
-          disabled={busy || !online || !!pending}
-          onclick={() => send({ type: 'restore' })}>Przywróć postać</button
-        >{/if}
+      Ta postać jest w archiwum. Zapisane dane i historia są zachowane.
     </div>{/if}
   {#if !data.canEdit}
     <div class="notice">
@@ -1072,13 +1092,27 @@
             </p>{/if}
         </div>
         <button class="button secondary" onclick={duplicate}>Utwórz kopię jako szkic</button>
-        <button
-          class="text-button danger"
-          onclick={() => {
-            if (confirm('Przenieść postać do archiwum?')) send({ type: 'archive' });
-          }}>Przenieś do archiwum</button
-        >
       {/if}
     </fieldset>
+    {#if tab === 'settings'}
+      <section class="panel" aria-label="Zarządzanie postacią">
+        <h3>Zarządzanie postacią</h3>
+        <p class="small muted">
+          Archiwizacja usuwa postać z bieżącej listy, zachowując jej dane i historię. Przywrócisz ją
+          z zakładki Archiwum.
+        </p>
+        {#if record.status === 'archived'}
+          <button
+            class="button secondary"
+            disabled={managementLocked}
+            onclick={() => send({ type: 'restore' })}>Przywróć postać</button
+          >
+        {:else}
+          <button class="button secondary" disabled={managementLocked} onclick={archive}
+            >Archiwizuj postać</button
+          >
+        {/if}
+      </section>
+    {/if}
   {/if}
 </div>

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Make character archive/restore actions visible on character cards, in the sheet header and in Settings. Confirm archiving, preserve pending edits and restore the original draft/active state with existing edit/privacy permissions.
+
 ## 0.4.0
 
 - Add a creator quick-start picker with 12 mundane book archetypes, stat previews, protected build replacement and ordinary creation validation; document the Rębacz budget correction.

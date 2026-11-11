@@ -18,7 +18,7 @@ The local application includes:
 - In-app XP awards/corrections, rank changes, advancement previews, attribute/skill/Edge increases and development history.
 - Player-recorded GM rulings and explicit numeric adjustments.
 - Landscape A4 character sheet inspired by the 2015 manual, with PDF saving through the browser print dialog and embedded Polish fonts.
-- Revision conflicts, retry deduplication, visible save state, latest-change undo, archiving and duplication.
+- Revision conflicts, retry deduplication, visible save state, latest-change undo, visible archive/restore controls on cards and sheets, and duplication.
 - A nonroot production container, SQLite snapshots and a restore helper.
 
 See [local validation and screenshots](docs/validation.md), [application design](docs/architecture.md), [rules decisions](docs/rules.md), [the full title-index audit](docs/catalog-audit.md), [graphics prompts](docs/graphics-prompts.md), [Docker Hub publishing](docs/ci.md), and [generic runtime setup](docs/deployment.md).

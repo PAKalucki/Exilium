@@ -663,7 +663,10 @@ label {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
 }
-.character-card {
+.character-card-entry {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   border: 1px solid #d1d5c6;
   background: var(--paper);
   border-radius: 4px;
@@ -671,8 +674,22 @@ label {
   box-shadow: var(--shadow);
   transition: transform 0.2s;
 }
-.character-card:hover {
+.character-card-entry:hover {
   transform: translateY(-4px);
+}
+.character-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.character-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding: 4px 24px;
+}
+.character-card-actions button {
+  min-height: 44px;
 }
 .card-topline {
   display: flex;
@@ -717,6 +734,7 @@ label {
 }
 .card-stats {
   display: flex;
+  margin-top: auto;
   border-top: 1px solid var(--line);
   padding: 20px 24px;
   gap: 23px;
@@ -820,6 +838,7 @@ label {
 }
 .sheet-actions {
   display: flex;
+  max-width: 360px;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;

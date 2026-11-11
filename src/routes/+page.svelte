@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { onMount } from 'svelte';
   import { rankName, totalXp, derived as calculateStats } from '../lib/rules/engine';
   import { portraitUrl } from '../lib/portraits';
@@ -13,6 +13,9 @@
   let name = $state(''),
     creating = $state(false),
     error = $state(''),
+    lifecycleBusy = $state(''),
+    lifecycleMessage = $state(''),
+    lifecycleError = $state(''),
     showArchived = $state(false),
     ownerFilter = $state('all');
   let owners = $derived(
@@ -29,7 +32,7 @@
     ),
   );
   async function create() {
-    if (!name.trim() || creating) return;
+    if (!name.trim() || creating || lifecycleBusy) return;
     creating = true;
     error = '';
     try {
@@ -45,6 +48,50 @@
       error = (e as Error).message;
     } finally {
       creating = false;
+    }
+  }
+  async function changeArchiveStatus(character: (typeof data.characters)[number]) {
+    if (!mounted || lifecycleBusy || creating || !character.canEdit || character.redacted?.length)
+      return;
+    const restoring = character.status === 'archived';
+    if (
+      !restoring &&
+      !confirm(
+        `Przenieść „${character.document.name}” do archiwum? Postać zniknie z bieżącej listy. Przywrócisz ją w zakładce Archiwum.`,
+      )
+    )
+      return;
+    lifecycleBusy = character.id;
+    lifecycleMessage = '';
+    lifecycleError = '';
+    try {
+      const response = await fetch(`/api/characters/${character.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          revision: character.revision,
+          commandId: crypto.randomUUID(),
+          command: { type: restoring ? 'restore' : 'archive' },
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || 'Nie udało się zmienić statusu postaci.');
+      lifecycleMessage = restoring
+        ? `Przywrócono postać „${character.document.name}”.`
+        : `Przeniesiono postać „${character.document.name}” do archiwum. Możesz ją stamtąd przywrócić.`;
+    } catch (e) {
+      lifecycleError =
+        e instanceof TypeError || (e instanceof DOMException && e.name === 'TimeoutError')
+          ? 'Nie udało się potwierdzić zmiany. Sprawdź połączenie i odśwież listę.'
+          : (e as Error).message;
+    } finally {
+      try {
+        await invalidateAll();
+      } catch {
+        lifecycleError = 'Nie udało się odświeżyć listy. Sprawdź połączenie i odśwież stronę.';
+      }
+      lifecycleBusy = '';
     }
   }
 </script>
@@ -157,6 +204,10 @@
         </select>
       </label>
     </div>
+    {#if lifecycleError}<p class="error library-feedback" role="alert">{lifecycleError}</p>{/if}
+    {#if lifecycleMessage}<p class="notice library-feedback" role="status">
+        {lifecycleMessage}
+      </p>{/if}
     {#if !characters.length}<p class="notice" role="status">
         Brak postaci pasujących do wybranych filtrów.
       </p>{/if}
@@ -166,49 +217,70 @@
           ...calculateStats(c),
           ...character.visibleStats,
         }}
-        <a class="character-card" href={`/characters/${character.id}`}
-          ><div class="card-topline">
-            <span class:active={character.status === 'active'} class="badge"
-              >{character.status === 'draft'
-                ? 'SZKIC'
-                : character.status === 'active'
-                  ? 'AKTYWNA'
-                  : 'ARCHIWUM'}</span
-            ><span class="card-id">EX / {character.id.slice(0, 6).toUpperCase()}</span>
-          </div>
-          <div class="character-monogram" aria-hidden="true">
-            {#if c.portraitId}<img
-                class="card-portrait"
-                src={portraitUrl(character.id, c.portraitId)}
-                alt=""
-                width="300"
-                height="137"
-                loading="lazy"
-              />{:else}{c.name[0].toUpperCase()}<span>+</span>{/if}
-          </div>
-          <div class="card-heading">
-            <small>{c.profession || 'Niezapisana historia'} · {c.origin || 'Exilium'}</small>
-            <h2>{c.name}</h2>
-            <p class="small muted">
-              Twórca: {character.ownerName}<br />{character.canEdit
-                ? character.isOwner
-                  ? 'Twoja karta · możesz edytować'
-                  : 'MG / administrator · możesz edytować'
-                : 'Tylko do odczytu'}
-            </p>
-            {#if !character.redacted?.includes('statistics')}<span class="muted small"
-                >{rankName(totalXp(c))} <span class="dot-separator">/</span> {totalXp(c)} PD</span
-              >{/if}
-          </div>
-          <div class="card-stats">
-            {#if character.redacted?.includes('statistics')}
-              <span>Statystyki ukryte</span>
-            {:else}
-              <span>OBRONA <b>{d.parry}</b></span><span>WYTRZ. <b>{d.totalToughness}</b></span><span
-                >TEMPO <b>{d.pace}</b></span
-              >{/if}<span class="card-arrow" aria-hidden="true">↗</span>
-          </div></a
-        >
+        <article class="character-card-entry" aria-label={`Postać: ${c.name}`}>
+          <a class="character-card" href={`/characters/${character.id}`}
+            ><div class="card-topline">
+              <span class:active={character.status === 'active'} class="badge"
+                >{character.status === 'draft'
+                  ? 'SZKIC'
+                  : character.status === 'active'
+                    ? 'AKTYWNA'
+                    : 'ARCHIWUM'}</span
+              ><span class="card-id">EX / {character.id.slice(0, 6).toUpperCase()}</span>
+            </div>
+            <div class="character-monogram" aria-hidden="true">
+              {#if c.portraitId}<img
+                  class="card-portrait"
+                  src={portraitUrl(character.id, c.portraitId)}
+                  alt=""
+                  width="300"
+                  height="137"
+                  loading="lazy"
+                />{:else}{c.name[0].toUpperCase()}<span>+</span>{/if}
+            </div>
+            <div class="card-heading">
+              <small>{c.profession || 'Niezapisana historia'} · {c.origin || 'Exilium'}</small>
+              <h2>{c.name}</h2>
+              <p class="small muted">
+                Twórca: {character.ownerName}<br />{character.canEdit
+                  ? character.isOwner
+                    ? 'Twoja karta · możesz edytować'
+                    : 'MG / administrator · możesz edytować'
+                  : 'Tylko do odczytu'}
+              </p>
+              {#if !character.redacted?.includes('statistics')}<span class="muted small"
+                  >{rankName(totalXp(c))} <span class="dot-separator">/</span> {totalXp(c)} PD</span
+                >{/if}
+            </div>
+            <div class="card-stats">
+              {#if character.redacted?.includes('statistics')}
+                <span>Statystyki ukryte</span>
+              {:else}
+                <span>OBRONA <b>{d.parry}</b></span><span>WYTRZ. <b>{d.totalToughness}</b></span
+                ><span>TEMPO <b>{d.pace}</b></span>{/if}<span class="card-arrow" aria-hidden="true"
+                >↗</span
+              >
+            </div></a
+          >
+          {#if character.canEdit && !character.redacted?.length}
+            <div class="character-card-actions">
+              <button
+                class="text-button"
+                class:danger={character.status !== 'archived'}
+                disabled={!mounted || !!lifecycleBusy || creating}
+                aria-label={`${character.status === 'archived' ? 'Przywróć' : 'Archiwizuj'} postać ${c.name}`}
+                onclick={() => changeArchiveStatus(character)}
+                >{lifecycleBusy === character.id
+                  ? character.status === 'archived'
+                    ? 'Przywracanie…'
+                    : 'Archiwizowanie…'
+                  : character.status === 'archived'
+                    ? 'Przywróć postać'
+                    : 'Archiwizuj'}</button
+              >
+            </div>
+          {/if}
+        </article>
       {/each}
       {#if !showArchived}<form
           class="new-character-card"
@@ -226,7 +298,9 @@
             bind:value={name}
             maxlength="160"
             required
-          /><button class="button primary" disabled={!mounted || creating || !name.trim()}
+          /><button
+            class="button primary"
+            disabled={!mounted || creating || !!lifecycleBusy || !name.trim()}
             >{creating ? 'Tworzenie…' : 'Stwórz postać'} <span aria-hidden="true">→</span></button
           >
         </form>{/if}
