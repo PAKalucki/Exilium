@@ -19,6 +19,7 @@
   } from '../rules/engine';
   import type { Character, Item } from '../rules/model';
   import ItemEditor from './ItemEditor.svelte';
+  import ArchetypePicker from './ArchetypePicker.svelte';
   import PortraitPicker from './PortraitPicker.svelte';
   import RuleDescription from './RuleDescription.svelte';
   import HelpPopover from './HelpPopover.svelte';
@@ -145,6 +146,7 @@
     </div>
     {#if step === 0}
       <p class="muted">Kim jesteś, zanim padnie pierwszy strzał?</p>
+      <ArchetypePicker bind:character {onchange} />
       <PortraitPicker {characterId} portraitId={character.portraitId} {onupload} {onremove} />
       <div class="form-grid">
         <label>Imię postaci<input bind:value={character.name} maxlength="160" required /></label

@@ -17,16 +17,17 @@ The [catalog title audit](catalog-audit.md) accounts for all 111 Edge and 48 Hin
 
 ## Source map
 
-| Source pages (printed) | Implementation                                                                                                 |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 9–10                   | Human Edge, attribute/skill budgets and costs, Hindrance spending, derived statistics                          |
-| 17–23, 44              | The 2015 skill list, linked attributes, separate Knowledge specializations; Knowledge general is a Smarts test |
-| 23–28, 45–46           | Hindrances; child/elder budgets, free Blind Edge, starting-fund and derived-stat effects                       |
-| 29–48                  | Edge names, prerequisites, professional consent and legendary trait targeting                                  |
-| 42–43                  | Rank thresholds, advancement choices and Legendary rate/frequency                                              |
-| 49–50                  | Equipment notation and carrying capacity                                                                       |
-| 55–62                  | Manual equipment fields and the reviewed initial compendium                                                    |
-| 68–75                  | Fuksy, Shaken and wounds; tracker only, no automatic damage resolution                                         |
+| Source pages (printed) | Implementation                                                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 9–10                   | Human Edge, attribute/skill budgets and costs, Hindrance spending, derived statistics                             |
+| 11–12                  | [Book archetypes for quick creation](archetypes.md), setting exclusions and the labelled Rębacz budget correction |
+| 17–23, 44              | The 2015 skill list, linked attributes, separate Knowledge specializations; Knowledge general is a Smarts test    |
+| 23–28, 45–46           | Hindrances; child/elder budgets, free Blind Edge, starting-fund and derived-stat effects                          |
+| 29–48                  | Edge names, prerequisites, professional consent and legendary trait targeting                                     |
+| 42–43                  | Rank thresholds, advancement choices and Legendary rate/frequency                                                 |
+| 49–50                  | Equipment notation and carrying capacity                                                                          |
+| 55–62                  | Manual equipment fields and the reviewed initial compendium                                                       |
+| 68–75                  | Fuksy, Shaken and wounds; tracker only, no automatic damage resolution                                            |
 
 Some source tables are less detailed than the full entry. The full entry takes precedence: for example, `Złota rączka` requires Niesamowita nauka and is therefore excluded, even though its summary appears mundane. `Pomysłowy Dobromir`, supernatural backgrounds, powers and magical racial options are excluded. `Niedowiarek`, `Szósty zmysł` and `Władca zwierząt` are not offered as automatic Exilium options pending an explicit mundane adaptation.
 

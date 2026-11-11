@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Add a creator quick-start picker with 12 mundane book archetypes, stat previews, protected build replacement and ordinary creation validation; document the Rębacz budget correction.
+- Filter the character list by all creators, your own characters or a selected user, independently of the current/archive view.
+- Add independent statistics privacy alongside background, origin and equipment, enforced in shared sheets, character lists, API responses and print/PDF exports.
+- Hide private sections from administrators by default, with an explicit per-sheet reveal/hide control; creators and MG always see full details.
+
 ## 0.3.1
 
 - Rebuild the A4 print sheet in landscape, inspired by the 2015 manual's character sheet, with grouped skills, dice markers, equipment tables and condition trackers. Keep narrative text and long records on continuation pages.

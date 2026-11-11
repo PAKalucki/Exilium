@@ -55,36 +55,40 @@
     {/if}
     <div class="print-emblem"><strong>EXILIUM</strong><span>Karta postaci</span></div>
   </header>
-  <div class="advancement-strip">
-    <span><b>Ranga</b> {v.rank}</span>
-    <span><b>Doświadczenie</b> {v.experience} PD</span>
-    <span><b>Niewydane rozwinięcia</b> {v.unspentAdvances}</span>
-    <span><b>Kość Figury</b> k6</span>
-  </div>
+  {#if v.statisticsHidden}
+    <p>Statystyki ukryte — zapytaj w grze.</p>
+  {:else}<div class="advancement-strip">
+      <span><b>Ranga</b> {v.rank}</span>
+      <span><b>Doświadczenie</b> {v.experience} PD</span>
+      <span><b>Niewydane rozwinięcia</b> {v.unspentAdvances}</span>
+      <span><b>Kość Figury</b> k6</span>
+    </div>{/if}
   <div class="print-columns">
     <section class="traits-column" aria-labelledby="print-traits">
       <h2 id="print-traits">Cechy i umiejętności</h2>
-      {#each v.traitGroups as group}
-        <div class="trait-group">
-          <div class="attribute-line">
-            <h3>{group.label}</h3>
-            {@render dieTrack(group.die)}
-            <b class="trait-value">{group.value}</b>
-          </div>
-          {#each group.skills as skill}
-            <div class="skill-line" class:untrained={!skill.die}>
-              <span class="skill-label">{skill.label}</span>
-              {@render dieTrack(skill.die)}
-              <b class="trait-value"
-                >{skill.value}{skill.modifier
-                  ? ` (${skill.modifier > 0 ? '+' : ''}${skill.modifier})`
-                  : ''}</b
-              >
+      {#if v.statisticsHidden}<p>Statystyki ukryte — zapytaj w grze.</p>{:else}
+        {#each v.traitGroups as group}
+          <div class="trait-group">
+            <div class="attribute-line">
+              <h3>{group.label}</h3>
+              {@render dieTrack(group.die)}
+              <b class="trait-value">{group.value}</b>
             </div>
-          {/each}
-        </div>
-      {/each}
-      <p class="sheet-caption">Niewykupiona umiejętność: k4−2. Zaznaczono aktualne kości.</p>
+            {#each group.skills as skill}
+              <div class="skill-line" class:untrained={!skill.die}>
+                <span class="skill-label">{skill.label}</span>
+                {@render dieTrack(skill.die)}
+                <b class="trait-value"
+                  >{skill.value}{skill.modifier
+                    ? ` (${skill.modifier > 0 ? '+' : ''}${skill.modifier})`
+                    : ''}</b
+                >
+              </div>
+            {/each}
+          </div>
+        {/each}
+        <p class="sheet-caption">Niewykupiona umiejętność: k4−2. Zaznaczono aktualne kości.</p>
+      {/if}
     </section>
     <div class="equipment-column">
       <section aria-labelledby="print-weapons">
@@ -139,52 +143,52 @@
         <div class="ruled-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       </section>
     </div>
-    <div class="reference-column">
-      <section aria-labelledby="print-stats">
-        <h2 id="print-stats">Współczynniki</h2>
-        <dl class="combat-stats">
-          {#each v.combatStats as stat}
-            <div>
-              <dt>{stat.label}</dt>
-              <dd>{stat.value}</dd>
-              <small>{stat.note || '\u00a0'}</small>
+    {#if !v.statisticsHidden}<div class="reference-column">
+        <section aria-labelledby="print-stats">
+          <h2 id="print-stats">Współczynniki</h2>
+          <dl class="combat-stats">
+            {#each v.combatStats as stat}
+              <div>
+                <dt>{stat.label}</dt>
+                <dd>{stat.value}</dd>
+                <small>{stat.note || '\u00a0'}</small>
+              </div>
+            {/each}
+          </dl>
+        </section>
+        <section class="session-section" aria-labelledby="print-session">
+          <h2 id="print-session">Podczas sesji</h2>
+          {#each [{ label: 'Rany', count: v.session.wounds, max: 3 }, { label: 'Zmęczenie', count: v.session.fatigue, max: 3 }] as track}
+            <div class="condition-line">
+              <b>{track.label}</b>
+              <span class="condition-boxes" aria-hidden="true">
+                {#each Array(track.max) as _, index}
+                  <span class:marked={index < track.count}>{index < track.count ? '×' : ''}</span>
+                {/each}
+              </span>
+              <span>{track.count}/{track.max}</span>
             </div>
           {/each}
-        </dl>
-      </section>
-      <section class="session-section" aria-labelledby="print-session">
-        <h2 id="print-session">Podczas sesji</h2>
-        {#each [{ label: 'Rany', count: v.session.wounds, max: 3 }, { label: 'Zmęczenie', count: v.session.fatigue, max: 3 }] as track}
           <div class="condition-line">
-            <b>{track.label}</b>
-            <span class="condition-boxes" aria-hidden="true">
-              {#each Array(track.max) as _, index}
-                <span class:marked={index < track.count}>{index < track.count ? '×' : ''}</span>
-              {/each}
-            </span>
-            <span>{track.count}/{track.max}</span>
+            <b>Szok</b><span>{v.session.shaken ? 'TAK' : 'NIE'}</span><b>Fuksy</b><span
+              class="benny-count">{v.session.bennies}</span
+            >
           </div>
-        {/each}
-        <div class="condition-line">
-          <b>Szok</b><span>{v.session.shaken ? 'TAK' : 'NIE'}</span><b>Fuksy</b><span
-            class="benny-count">{v.session.bennies}</span
-          >
-        </div>
-        <p class="condition-summary">
-          Kara za Rany i Zmęczenie: −{v.session.penalty}{#if v.session.incapacitated}<br /><b
-              >WYELIMINOWANIE</b
-            >{/if}
-        </p>
-      </section>
-      {#each [{ title: 'Zawady', lines: v.hindrances }, { title: 'Przewagi', lines: v.edges }] as section}
-        <section class="abilities-section">
-          <h2>{section.title}</h2>
-          {#each section.lines as line}<p class="ability-entry">{line}</p>
-          {:else}<p class="empty-cell">Brak.</p>{/each}
+          <p class="condition-summary">
+            Kara za Rany i Zmęczenie: −{v.session.penalty}{#if v.session.incapacitated}<br /><b
+                >WYELIMINOWANIE</b
+              >{/if}
+          </p>
         </section>
-      {/each}
-      <p class="sheet-caption">Modyfikatory sytuacyjne sprawdź w opisach przewag i zawad.</p>
-    </div>
+        {#each [{ title: 'Zawady', lines: v.hindrances }, { title: 'Przewagi', lines: v.edges }] as section}
+          <section class="abilities-section">
+            <h2>{section.title}</h2>
+            {#each section.lines as line}<p class="ability-entry">{line}</p>
+            {:else}<p class="empty-cell">Brak.</p>{/each}
+          </section>
+        {/each}
+        <p class="sheet-caption">Modyfikatory sytuacyjne sprawdź w opisach przewag i zawad.</p>
+      </div>{/if}
   </div>
   {#if supplements.length}
     <div class="print-supplements">

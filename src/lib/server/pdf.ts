@@ -1,14 +1,15 @@
 import PDFDocument from 'pdfkit';
 import { resolve } from 'node:path';
-import type { Character, VisibleStats } from '../rules/model';
+import type { Character, VisibleStats, HiddenSection } from '../rules/model';
 import { exportView } from '../rules/export';
 
 export async function characterPdf(
   c: Character,
   portrait?: Uint8Array,
   visibleStats?: VisibleStats,
+  redacted: HiddenSection[] = [],
 ): Promise<Buffer> {
-  const v = exportView(c, visibleStats),
+  const v = exportView(c, visibleStats, redacted),
     doc = new PDFDocument({
       size: 'A4',
       margin: 46,
@@ -65,6 +66,7 @@ export async function characterPdf(
     text(v.advancement, true);
   }
   section('Wygląd', [v.appearance].filter(Boolean));
+  if (v.statisticsHidden) section('Statystyki', ['Statystyki ukryte — zapytaj w grze.']);
   section(
     'Współczynniki',
     v.stats.map(([a, b]) => `${a}: ${b}`),
@@ -77,7 +79,7 @@ export async function characterPdf(
     'Umiejętności',
     v.skills.map(([a, b]) => `${a}: ${b}`),
   );
-  section('Stan podczas sesji', [v.conditions]);
+  section('Stan podczas sesji', [v.conditions].filter(Boolean));
   section('Przewagi', v.edges);
   section('Zawady', v.hindrances);
   section(

@@ -22,6 +22,13 @@ const idParameter = {
   description: 'UUID zasobu.',
   schema: { type: 'string', format: 'uuid' },
 };
+const revealPrivateParameter = {
+  name: 'revealPrivate',
+  in: 'query',
+  schema: { type: 'string', enum: ['1'] },
+  description:
+    'Administrator: jawnie odkryj prywatne sekcje tej karty. Nie daje dodatkowych uprawnień Graczowi. MG i twórca zawsze widzą pełne dane.',
+};
 export function openApiDocument(version: string) {
   const documentExample = {
     category: 'Narzędzia',
@@ -98,10 +105,14 @@ export function openApiDocument(version: string) {
             status: { enum: ['draft', 'active', 'archived'] },
             updatedAt: { type: 'string', format: 'date-time' },
             document: ref('Character'),
-            redacted: { type: 'array', items: { enum: ['background', 'origin', 'equipment'] } },
+            redacted: {
+              type: 'array',
+              items: { enum: ['statistics', 'background', 'origin', 'equipment'] },
+            },
             visibleStats: {
               type: 'object',
-              description: 'Publiczne współczynniki z pełnej karty, gdy ekwipunek jest ukryty.',
+              description:
+                'Publiczne współczynniki z pełnej karty, gdy ekwipunek jest ukryty, a statystyki jawne.',
               properties: Object.fromEntries(
                 [
                   'parry',
@@ -233,7 +244,7 @@ export function openApiDocument(version: string) {
           'Karta postaci; ukryte sekcje są usuwane z odpowiedzi',
           'Postacie',
           ref('CharacterRecord'),
-          { parameters: [idParameter] },
+          { parameters: [idParameter, revealPrivateParameter] },
         ),
       },
       '/api/characters/{id}/pdf': {
@@ -242,7 +253,7 @@ export function openApiDocument(version: string) {
           'Postacie',
           {},
           {
-            parameters: [idParameter],
+            parameters: [idParameter, revealPrivateParameter],
             responses: {
               200: {
                 description: 'Dokument PDF.',

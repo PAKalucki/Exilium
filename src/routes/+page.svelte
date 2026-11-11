@@ -13,10 +13,19 @@
   let name = $state(''),
     creating = $state(false),
     error = $state(''),
-    showArchived = $state(false);
+    showArchived = $state(false),
+    ownerFilter = $state('all');
+  let owners = $derived(
+    Array.from(new Map(data.characters.map((c) => [c.ownerId, c.ownerName])), ([id, name]) => ({
+      id,
+      name,
+    })).sort((a, b) => a.name.localeCompare(b.name, 'pl') || a.id.localeCompare(b.id)),
+  );
   let characters = $derived(
-    data.characters.filter((c) =>
-      showArchived ? c.status === 'archived' : c.status !== 'archived',
+    data.characters.filter(
+      (c) =>
+        (showArchived ? c.status === 'archived' : c.status !== 'archived') &&
+        (ownerFilter === 'all' || (ownerFilter === 'mine' ? c.isOwner : c.ownerId === ownerFilter)),
     ),
   );
   async function create() {
@@ -125,16 +134,32 @@
       <div class="segmented">
         <button
           disabled={!mounted}
+          aria-pressed={!showArchived}
           class:chosen={!showArchived}
-          onclick={() => (showArchived = false)}>Wszystkie postacie</button
+          onclick={() => (showArchived = false)}>Bieżące postacie</button
         ><button
           disabled={!mounted}
+          aria-pressed={showArchived}
           class:chosen={showArchived}
           onclick={() => (showArchived = true)}>Archiwum</button
         >
       </div>
-      <span class="small muted">Karty drużyny · widoczne po zalogowaniu</span>
+      <label class="library-owner-filter">
+        Twórca postaci
+        <select bind:value={ownerFilter} disabled={!mounted}>
+          <option value="all">Wszystkie postacie</option>
+          <option value="mine">Moje postacie</option>
+          <optgroup label="Wybrany użytkownik">
+            {#each owners as owner (owner.id)}
+              <option value={owner.id}>{owner.name}</option>
+            {/each}
+          </optgroup>
+        </select>
+      </label>
     </div>
+    {#if !characters.length}<p class="notice" role="status">
+        Brak postaci pasujących do wybranych filtrów.
+      </p>{/if}
     <div class="character-grid">
       {#each characters as character}
         {@const c = character.document}{@const d = {
@@ -171,14 +196,17 @@
                   : 'MG / administrator · możesz edytować'
                 : 'Tylko do odczytu'}
             </p>
-            <span class="muted small"
-              >{rankName(totalXp(c))} <span class="dot-separator">/</span> {totalXp(c)} PD</span
-            >
+            {#if !character.redacted?.includes('statistics')}<span class="muted small"
+                >{rankName(totalXp(c))} <span class="dot-separator">/</span> {totalXp(c)} PD</span
+              >{/if}
           </div>
           <div class="card-stats">
-            <span>OBRONA <b>{d.parry}</b></span><span>WYTRZ. <b>{d.totalToughness}</b></span><span
-              >TEMPO <b>{d.pace}</b></span
-            ><span class="card-arrow" aria-hidden="true">↗</span>
+            {#if character.redacted?.includes('statistics')}
+              <span>Statystyki ukryte</span>
+            {:else}
+              <span>OBRONA <b>{d.parry}</b></span><span>WYTRZ. <b>{d.totalToughness}</b></span><span
+                >TEMPO <b>{d.pace}</b></span
+              >{/if}<span class="card-arrow" aria-hidden="true">↗</span>
           </div></a
         >
       {/each}

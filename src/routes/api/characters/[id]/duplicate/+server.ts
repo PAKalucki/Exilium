@@ -2,12 +2,18 @@ import { json } from '@sveltejs/kit';
 import { DomainError, repository } from '../../../../../lib/server/db';
 import { apiError } from '../../../../../lib/server/http';
 import { characterSchema } from '../../../../../lib/rules/model';
+import { requirePrivateCharacterAccess } from '../../../../../lib/server/visibility';
 import { effectiveBuild, rankIndex, spentAdvances, totalXp } from '../../../../../lib/rules/engine';
-export function POST({ locals, params }: import('./$types').RequestEvent) {
+export function POST({ locals, params, url }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
     const source = repository().editable(locals.user.id, params.id),
       c = structuredClone(source.document);
+    requirePrivateCharacterAccess(
+      source,
+      locals.user,
+      url.searchParams.get('revealPrivate') === '1',
+    );
     if (source.status !== 'draft') {
       c.build = effectiveBuild(c) as typeof c.build;
       const last = c.advances.findLastIndex((a) => a.kind === 'attribute' && a.rank === 4);

@@ -2,24 +2,26 @@
 
 Every new Discord guild member signs in as **Gracz** (`player`). `DEPLOYMENT_ADMIN_DISCORD_ID` bootstraps the app owner's Discord identity as **Administrator** (`admin`), including an existing account on restart. Keep this ID in deployment settings. The configured owner cannot be disabled or demoted through the app. There is no first-user-wins or email/name-based administrator grant.
 
-| Capability                                           | Gracz                     | MG (`gm`)             | Administrator         |
-| ---------------------------------------------------- | ------------------------- | --------------------- | --------------------- |
-| Create and edit own sheets                           | Yes                       | Yes                   | Yes                   |
-| Read other sheets                                    | With privacy applied      | Full                  | Full                  |
-| Edit another person's sheet                          | No                        | Yes                   | Yes                   |
-| Submit an item                                       | Pending approval          | Published immediately | Published immediately |
-| Edit own pending/rejected item                       | Yes; resubmits for review | Yes                   | Yes                   |
-| Edit approved items, approve/reject, archive/restore | No                        | Yes                   | Yes                   |
-| Manage accounts and roles                            | No                        | No                    | Yes                   |
-| View diagnostics API                                 | No                        | Yes                   | Yes                   |
+| Capability                                           | Gracz                     | MG (`gm`)             | Administrator                              |
+| ---------------------------------------------------- | ------------------------- | --------------------- | ------------------------------------------ |
+| Create and edit own sheets                           | Yes                       | Yes                   | Yes                                        |
+| Read other sheets                                    | With privacy applied      | Full                  | Privacy applied; explicit reveal available |
+| Edit another person's sheet                          | No                        | Yes                   | Reveal private sections first              |
+| Submit an item                                       | Pending approval          | Published immediately | Published immediately                      |
+| Edit own pending/rejected item                       | Yes; resubmits for review | Yes                   | Yes                                        |
+| Edit approved items, approve/reject, archive/restore | No                        | Yes                   | Yes                                        |
+| Manage accounts and roles                            | No                        | No                    | Yes                                        |
+| View diagnostics API                                 | No                        | Yes                   | Yes                                        |
 
 The administrator uses `/users` to assign roles and enable/disable accounts after the person has signed in once. Changes are audited. A stale account change is rejected. The last active administrator cannot be disabled or demoted. Disabling an account invalidates its sessions and personal API tokens. Roles are read from the database for each session/token request, so changing a role also changes existing sessions and tokens immediately. GM edits retain the sheet's creator and record the GM's own actor ID.
 
 ## Privacy
 
-The **Ustawienia** tab on draft and active character sheets has three independent switches: **Ukryj historię**, **Ukryj pochodzenie**, and **Ukryj ekwipunek i zasoby**. All default to visible for existing and new sheets. “Historia” means the character's personal background, not the audit history of changes. Equipment hiding includes inventory, cash, credits and targeted inventory references. Combat totals remain public and are calculated from the full saved sheet before redaction.
+The **Ustawienia** tab on draft and active character sheets has four independent switches: **Ukryj statystyki**, **Ukryj historię**, **Ukryj pochodzenie**, and **Ukryj ekwipunek i zasoby**. All default to visible for new sheets. Existing privacy choices are preserved and statistics remain visible until explicitly hidden. “Historia” means the character's personal background. Statistics hiding covers attributes, skills, combat values, Edges, Hindrances, session conditions, XP, advances, legacy baselines and GM rulings/adjustments; change history is also omitted from that shared view. Equipment hiding includes inventory, cash, credits and targeted inventory references. When statistics remain public, combat totals are calculated from the full saved sheet before equipment redaction. Hiding statistics leaves independently public equipment and background visible, but omits carrying capacity and encumbrance that could disclose private traits.
 
-Other players see blurred placeholder text. The actual hidden content is removed server-side from page data, list/detail API responses, print views and PDF exports. The creator, MG and Administrator see full content. This is not CSS-only hiding. Independently written notes, motivations and rulings remain public; avoid copying a secret into another field if it should stay private.
+Other players and, by default, administrators see placeholders. The actual hidden content is removed server-side from page data, list/detail API responses, print views and PDF exports. The creator and MG always see full content. Independently written session notes and motivations remain public; avoid copying a secret into another field if it should stay private.
+
+An administrator can choose **Odkryj prywatne szczegóły** on another person's sheet, then **Ukryj prywatne szczegóły** to return to the private view. Reveal applies to that sheet's current URL and its print link, preserves the owner's privacy choices and does not enable disclosure on the character list or other sheets. Editing, copying and portrait uploads on a private sheet require explicit reveal first, so an administrator cannot save a redacted document over the original. The detail API, PDF endpoint and browser-session mutations accept `?revealPrivate=1` for this explicit administrator action; Players cannot bypass privacy with that parameter. MG never needs it.
 
 Privacy changes cannot retract information another player already saw or exported while it was public. Existing saved inventory copies do not change when the compendium changes.
 
@@ -45,7 +47,7 @@ Use `Authorization: Bearer TOKEN` over the configured HTTPS origin. Tokens accep
 | GET      | `/api/me`                                 | `read`; current name, ID, role and scopes                                          |
 | GET      | `/api/characters`                         | `read`; all sheets with viewer privacy                                             |
 | GET      | `/api/characters/:id`                     | `read`; one sheet with viewer privacy                                              |
-| GET      | `/api/characters/:id/pdf`                 | `read`; redacted export for Players                                                |
+| GET      | `/api/characters/:id/pdf`                 | `read`; viewer privacy, optional explicit administrator reveal                     |
 | GET      | `/api/characters/:id/portrait`            | `read`; authenticated portrait                                                     |
 | GET      | `/api/compendium`                         | `read`; approved active catalog only                                               |
 | GET      | `/api/compendium?archived=1`              | `read`; approved catalog plus own submissions, or all for MG/Admin                 |

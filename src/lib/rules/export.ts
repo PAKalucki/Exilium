@@ -1,9 +1,21 @@
 import { attributes, edges, hindrances, skills, skillInfo } from '../content/catalog';
 import { derived, rankName, totalXp, availableAdvances, traitValue } from './engine';
-import { hasAmmunitionCounters, type Character, type VisibleStats } from './model';
-export function exportView(c: Character, visibleStats?: VisibleStats) {
+import {
+  hasAmmunitionCounters,
+  type Character,
+  type VisibleStats,
+  type HiddenSection,
+} from './model';
+export function exportView(
+  c: Character,
+  visibleStats?: VisibleStats,
+  redacted: HiddenSection[] = [],
+) {
   const d = { ...derived(c), ...visibleStats };
-  return {
+  const statisticsHidden = redacted.includes('statistics');
+  const equipmentHidden = redacted.includes('equipment') || !!visibleStats;
+  const view = {
+    statisticsHidden,
     name: c.name,
     appearance: c.appearance,
     portraitId: c.portraitId,
@@ -102,12 +114,14 @@ export function exportView(c: Character, visibleStats?: VisibleStats) {
         .filter(Boolean)
         .join(' · '),
     })),
-    funds: visibleStats
+    funds: equipmentHidden
       ? 'Ekwipunek i zasoby ukryte — zapytaj w grze.'
       : `Gotówka: ${c.cash} $ · Kredyty elektroniczne: ${c.credits}`,
-    load: visibleStats
+    load: equipmentHidden
       ? ''
-      : `Waga: ${d.weightKnown}${d.weightUnknown ? ' + nieznana' : ''} / udźwig ${d.capacity} jedn. SW. Przeciążenie: co najmniej −${d.encumbrance}.`,
+      : statisticsHidden
+        ? `Waga: ${d.weightKnown}${d.weightUnknown ? ' + nieznana' : ''} jedn. SW.`
+        : `Waga: ${d.weightKnown}${d.weightUnknown ? ' + nieznana' : ''} / udźwig ${d.capacity} jedn. SW. Przeciążenie: co najmniej −${d.encumbrance}.`,
     history: c.advances.map(
       (a, i) =>
         `${(c.legacy?.spent ?? 0) + i + 1}. ${a.kind === 'edge' ? edges.find((e) => e.id === a.target)?.name : a.kind === 'attribute' ? attributes[a.target as keyof typeof attributes] : skillInfo(a.target)?.name}${a.kind === 'twoSkills' ? ` + ${skillInfo(a.second)?.name}` : ''} · ${a.xp} PD${a.note ? ` · ${a.note}` : ''}`,
@@ -130,6 +144,26 @@ export function exportView(c: Character, visibleStats?: VisibleStats) {
       ? `Podstawa istniejącej karty: ${c.legacy.xp} PD; ${c.legacy.spent} historycznych rozwinięć. ${c.legacy.reason}`
       : '',
   };
+  if (statisticsHidden) {
+    view.advancement = '';
+    view.rank = '';
+    view.experience = 0;
+    view.unspentAdvances = 0;
+    view.traitGroups = [];
+    view.combatStats = [];
+    view.stats = [];
+    view.attributes = [];
+    view.skills = [];
+    view.conditions = '';
+    view.edges = [];
+    view.hindrances = [];
+    view.history = [];
+    view.xp = [];
+    view.rulings = [];
+    view.adjustments = '';
+    view.legacy = '';
+  }
+  return view;
 }
 export function formatDie(value: number) {
   return value > 12 ? `k12+${value - 12}` : `k${value}`;

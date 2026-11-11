@@ -41,9 +41,11 @@
   import SettingChoice from '../../../lib/components/SettingChoice.svelte';
   import { originDescriptions, casteDescriptions } from '../../../lib/content/setting';
   let { data } = $props();
+  let revealQuery = $derived(data.privateDetailsRevealed ? '?revealPrivate=1' : '');
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
   let record = $state.raw<CharacterRecord>(untrack(() => data.record)),
     character = $state<Character>(untrack(() => clone(data.record.document)));
+  let statisticsHidden = $derived(record.redacted?.includes('statistics'));
   let history = $state(untrack(() => data.history)),
     tab = $state(untrack(() => (data.record.status === 'draft' ? 'creator' : 'overview')));
   let mounted = $state(false);
@@ -175,7 +177,7 @@
     try {
       let result: CharacterRecord;
       if (data.canEdit) {
-        const response = await fetch(`/api/characters/${record.id}`);
+        const response = await fetch(`/api/characters/${record.id}${revealQuery}`);
         if (!response.ok) throw new Error('Nie udało się odświeżyć karty.');
         result = await response.json();
       } else {
@@ -193,11 +195,19 @@
         (!discard && dirty)
       )
         return;
-      if (discard || result.revision !== startedRevision) {
+      if (
+        discard ||
+        result.revision !== startedRevision ||
+        JSON.stringify(result.document) !== JSON.stringify(record.document)
+      ) {
         character = clone(result.document);
         adjustments = clone(result.document.adjustments);
       }
       record = result;
+      if (data.canEdit && result.redacted?.length) {
+        window.location.reload();
+        return;
+      }
       dirty = false;
       pending = null;
       conflict = false;
@@ -221,7 +231,7 @@
     try {
       const response =
         payload.command.type === 'portrait'
-          ? await fetch(`/api/characters/${record.id}/portrait`, {
+          ? await fetch(`/api/characters/${record.id}/portrait${revealQuery}`, {
               method: 'POST',
               headers: {
                 'Content-Type': payload.command.file.type,
@@ -231,7 +241,7 @@
               body: payload.command.file,
               signal: AbortSignal.timeout(30000),
             })
-          : await fetch(`/api/characters/${record.id}`, {
+          : await fetch(`/api/characters/${record.id}${revealQuery}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
@@ -249,6 +259,12 @@
         );
       }
       record = result;
+      if (result.redacted?.length) {
+        pending = null;
+        dirty = false;
+        window.location.reload();
+        return true;
+      }
       if (payload.command.type === 'saveDraft' || payload.command.type === 'profile') {
         const unchanged =
           payload.command.type === 'saveDraft'
@@ -345,7 +361,9 @@
     try {
       if (!(await flush())) return;
       busy = true;
-      const response = await fetch(`/api/characters/${record.id}/duplicate`, { method: 'POST' });
+      const response = await fetch(`/api/characters/${record.id}/duplicate${revealQuery}`, {
+        method: 'POST',
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       destination = `/characters/${result.id}`;
@@ -432,14 +450,35 @@
             class="button primary"
             disabled={locked}
             onclick={() => send({ type: 'finalize' })}>Zatwierdź postać →</button
-          >{/if}{:else}<span class="rank-pill">{rankName(xp)} <span>/ {xp} PD</span></span>{/if}<a
+          >{/if}{:else if !statisticsHidden}<span class="rank-pill"
+          >{rankName(xp)} <span>/ {xp} PD</span></span
+        >{/if}<a
         class="button secondary"
         target="_blank"
         rel="noopener"
-        href={`/characters/${record.id}/print`}>Drukuj / PDF ↗</a
+        href={`/characters/${record.id}/print${revealQuery}`}>Drukuj / PDF ↗</a
       >
     </div>
   </div>
+  {#if data.canRevealPrivate}
+    <div class="notice" role="note" aria-label="Prywatne szczegóły — administrator">
+      {#if data.privateDetailsRevealed}
+        Prywatne szczegóły są odkryte w tym widoku administratora.
+        <a class="button secondary compact" data-sveltekit-reload href={`/characters/${record.id}`}
+          >Ukryj prywatne szczegóły</a
+        >
+      {:else}
+        Prywatne szczegóły są ukryte. Jako administrator możesz je odkryć, aby je przeglądać lub
+        edytować.
+        <a
+          class="button secondary compact"
+          data-sveltekit-reload
+          data-sveltekit-preload-data="false"
+          href={`/characters/${record.id}?revealPrivate=1`}>Odkryj prywatne szczegóły</a
+        >
+      {/if}
+    </div>
+  {/if}
   {#if message}<div class="error error-bar" role="alert">
       <span>{message}</span>
       <div>

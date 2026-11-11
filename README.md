@@ -6,6 +6,7 @@ The local application includes:
 
 - Discord OAuth sign-in for members of one configured Discord server, revocable sessions and shared character reading with role-aware editing and section privacy.
 - Guided creation, saved drafts and manual entry of existing characters with explicit historical XP/advance baselines.
+- Optional [book archetypes](docs/archetypes.md) for quick creation: 12 mundane human builds with previews, editable stats and explicit remaining choices.
 - Beginner help popups for traits, skills, dice, derived stats and session conditions; visible attribute explanations in step 2.
 - Explicit origin/caste/profession dropdowns, custom entries and guide-backed descriptions of 12 origins and all five castes.
 - Optional portrait uploads (JPG/PNG, up to 5 MB) and appearance text, readable by signed-in players and included in print/PDF output.
@@ -96,6 +97,6 @@ Dice, initiative, encounters, shared logs, offline editing, English localization
 
 The footer and `/api/health` display the release version from `package.json`. See [changelog](CHANGELOG.md) and [roles, privacy and API](docs/access-and-api.md) for the permission matrix, administrator bootstrap, item review workflow and scoped token API. The administrator panel is `/users`; personal tokens are managed at `/account`.
 
-Set `DEPLOYMENT_ADMIN_DISCORD_ID` to the app owner's Discord user ID in deployment settings. New users default to Player. `/compendium` accepts Player proposals for GM/Admin approval. Background, origin and equipment can be hidden independently from other Players; the server also applies this to API and PDF/print exports.
+Set `DEPLOYMENT_ADMIN_DISCORD_ID` to the app owner's Discord user ID in deployment settings. New users default to Player. `/compendium` accepts Player proposals for GM/Admin approval. Statistics, background, origin and equipment have independent privacy switches, enforced in page data, API and PDF/print exports. Creators and MG always see full details. Administrators see private sections hidden by default and can explicitly reveal them on each sheet.
 
 Interactive [Swagger / OpenAPI](docs/access-and-api.md#swagger--openapi) documentation is available at `/api-docs` after signing in, with bearer-token execution and a downloadable `/api/openapi.json` specification. Swagger assets are self-hosted and loaded only on the docs page.

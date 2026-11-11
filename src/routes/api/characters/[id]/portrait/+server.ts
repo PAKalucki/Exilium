@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { repository, DomainError } from '../../../../../lib/server/db';
 import { apiError } from '../../../../../lib/server/http';
 import { normalizePortrait, portraitBody } from '../../../../../lib/server/portraits';
+import { requirePrivateCharacterAccess } from '../../../../../lib/server/visibility';
 
 export function GET({ locals, params, url, request }: import('./$types').RequestEvent) {
   try {
@@ -33,10 +34,15 @@ export function GET({ locals, params, url, request }: import('./$types').Request
     return apiError(e);
   }
 }
-export async function POST({ locals, params, request }: import('./$types').RequestEvent) {
+export async function POST({ locals, params, request, url }: import('./$types').RequestEvent) {
   try {
     if (!locals.user) throw new DomainError(401, 'Zaloguj się ponownie.');
     const record = repository().editable(locals.user.id, params.id);
+    requirePrivateCharacterAccess(
+      record,
+      locals.user,
+      url.searchParams.get('revealPrivate') === '1',
+    );
     if (record.status === 'archived')
       throw new DomainError(422, 'Zarchiwizowana postać jest tylko do odczytu.');
     const { revision, commandId } = z

@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { beforeEach, afterEach, it, expect } from 'vitest';
 import { Repository } from '../src/lib/server/db';
 import { execute } from '../src/lib/server/commands';
-import { characterForViewer } from '../src/lib/server/visibility';
+import { characterForViewer, requirePrivateCharacterAccess } from '../src/lib/server/visibility';
 import { IdentityRepository } from '../src/lib/server/identity';
-import { newCharacter, newItem } from '../src/lib/rules/model';
+import { characterSchema, newCharacter, newItem, privacySchema } from '../src/lib/rules/model';
 import { derived } from '../src/lib/rules/engine';
 import { exportView } from '../src/lib/rules/export';
 let repo: Repository, a: string, b: string, gm: string, admin: string;
@@ -134,7 +134,7 @@ it('GMs edit other sheets with their own actor ID and cannot use user management
   ).toBe(gm);
   expect(() => repo.identity.list(gm)).toThrow();
 });
-it('redacts each selected section server-side, keeps public combat stats, and reveals originals to owner/GM/admin', () => {
+it('redacts private sections, preserves public combat stats, and requires admins to reveal details', () => {
   const c = newCharacter('Prywatna karta');
   c.background = 'HISTORIA-TAJNA';
   c.origin = 'POCHODZENIE-TAJNE';
@@ -142,7 +142,7 @@ it('redacts each selected section server-side, keeps public combat stats, and re
   c.inventory = [
     { ...newItem(), name: 'EKWIPUNEK-TAJNY', kind: 'armor', armor: 4, equipped: true },
   ];
-  c.privacy = { background: true, origin: true, equipment: true };
+  c.privacy = { statistics: false, background: true, origin: true, equipment: true };
   const record = repo.create(a, c.name, c),
     view = characterForViewer(record, repo.identity.user(b));
   expect(JSON.stringify(view)).not.toMatch(/HISTORIA-TAJNA|POCHODZENIE-TAJNE|EKWIPUNEK-TAJNY/);
@@ -150,11 +150,14 @@ it('redacts each selected section server-side, keeps public combat stats, and re
   expect(view.document.cash).toBe(0);
   expect(view.visibleStats?.totalToughness).toBe(derived(c).totalToughness);
   expect(exportView(view.document, view.visibleStats).background).toContain('ukryta');
-  for (const actor of [a, gm, admin])
+  for (const actor of [a, gm])
     expect(characterForViewer(record, repo.identity.user(actor)).document).toEqual(c);
+  expect(characterForViewer(record, repo.identity.user(admin))).toEqual(view);
+  expect(characterForViewer(record, repo.identity.user(admin), true).document).toEqual(c);
+  expect(characterForViewer(record, repo.identity.user(b), true)).toEqual(view);
   for (const section of ['background', 'origin', 'equipment'] as const) {
     const single = structuredClone(record);
-    single.document.privacy = { background: false, origin: false, equipment: false };
+    single.document.privacy = privacySchema.parse({});
     single.document.privacy[section] = true;
     const filtered = characterForViewer(single, repo.identity.user(b));
     expect(filtered.redacted).toEqual([section]);
@@ -163,6 +166,136 @@ it('redacts each selected section server-side, keeps public combat stats, and re
     if (section !== 'equipment') expect(filtered.document.inventory).toEqual(c.inventory);
   }
   expect(record.document.background).toBe(c.background);
+});
+
+it.each(
+  Array.from({ length: 16 }, (_, mask) => ({
+    statistics: !!(mask & 1),
+    origin: !!(mask & 2),
+    background: !!(mask & 4),
+    equipment: !!(mask & 8),
+  })),
+)('keeps all four privacy settings independent: %j', (privacy) => {
+  const c = newCharacter('Niezależna prywatność');
+  c.privacy = privacy;
+  c.background = 'PRYWATNA-HISTORIA';
+  c.origin = 'PRYWATNE-POCHODZENIE';
+  c.build.attributes.strength = 12;
+  c.build.skills['knowledge:PRYWATNA-WIEDZA'] = 10;
+  c.build.edges = [{ id: 'alertness', target: '' }];
+  c.build.hindrances = [{ id: 'enemy', severity: 2 }];
+  c.conditions.wounds = 2;
+  c.xp = [
+    { id: crypto.randomUUID(), amount: 50, note: 'PRYWATNE-PD', date: new Date().toISOString() },
+  ];
+  c.legacy = {
+    xp: 20,
+    spent: 4,
+    attributeUsed: false,
+    lastLegendaryAttribute: null,
+    reason: 'PRYWATNA-PODSTAWA',
+  };
+  c.advances = [
+    {
+      id: crypto.randomUUID(),
+      kind: 'newSkill',
+      target: 'repair',
+      second: '',
+      edgeTarget: '',
+      note: 'PRYWATNY-ROZWÓJ',
+      xp: 25,
+      rank: 1,
+      date: new Date().toISOString(),
+    },
+  ];
+  c.rulings = [
+    {
+      id: crypto.randomUUID(),
+      code: 'test',
+      reason: 'PRYWATNA-DECYZJA',
+      ruling: 'PRYWATNE-USTALENIE',
+      date: new Date().toISOString(),
+    },
+  ];
+  c.adjustments = { parry: 1, toughness: 2, pace: 1, charisma: 2, reason: 'PRYWATNA-KOREKTA' };
+  c.cash = 99;
+  c.inventory = [
+    {
+      ...newItem(),
+      name: 'PUBLICZNY-PRZEDMIOT',
+      weight: 5,
+      kind: 'armor',
+      armor: 4,
+      equipped: true,
+    },
+  ];
+  const record = repo.create(a, c.name, c);
+  for (const actor of [b, admin]) {
+    const view = characterForViewer(record, repo.identity.user(actor));
+    const exported = exportView(view.document, view.visibleStats, view.redacted);
+    expect(view.redacted?.sort()).toEqual(
+      Object.keys(privacy)
+        .filter((key) => privacy[key as keyof typeof privacy])
+        .sort(),
+    );
+    expect(view.document.background).toBe(privacy.background ? '' : c.background);
+    expect(view.document.origin).toBe(privacy.origin ? '' : c.origin);
+    expect(view.document.inventory).toEqual(privacy.equipment ? [] : c.inventory);
+    expect(view.document.cash).toBe(privacy.equipment ? 0 : 99);
+    expect(exported.statisticsHidden).toBe(privacy.statistics);
+    expect(exported.funds.includes('ukryte')).toBe(privacy.equipment);
+    if (privacy.statistics) {
+      expect(JSON.stringify(view)).not.toMatch(
+        /PRYWATN[AEY]-(WIEDZA|PD|PODSTAWA|ROZWÓJ|DECYZJA|USTALENIE|KOREKTA)/,
+      );
+      expect(view.document.build).toEqual(newCharacter().build);
+      expect(view.document.conditions).toEqual(newCharacter().conditions);
+      expect(view.document.adjustments).toEqual(newCharacter().adjustments);
+      expect(view.document.legacy).toBeNull();
+      for (const key of ['xp', 'advances', 'rulings'] as const)
+        expect(view.document[key]).toEqual([]);
+      expect(view.visibleStats).toBeUndefined();
+      expect(exported.traitGroups).toEqual([]);
+      expect(exported.combatStats).toEqual([]);
+      expect(exported.conditions).toBe('');
+      expect(exported.load).not.toContain('udźwig');
+    } else {
+      expect(view.document.build).toEqual(c.build);
+      expect(view.document.xp).toEqual(c.xp);
+      expect(exported.stats[1][1]).toContain(String(derived(c).totalToughness));
+    }
+  }
+  for (const actor of [a, gm])
+    expect(characterForViewer(record, repo.identity.user(actor))).toEqual(record);
+  expect(characterForViewer(record, repo.identity.user(admin), true)).toEqual(record);
+  expect(repo.read(record.id).document).toEqual(c);
+});
+
+it('requires explicit admin reveal for edits/copies, but never for owners or GMs', () => {
+  const c = newCharacter();
+  c.privacy.statistics = true;
+  const record = repo.create(a, c.name, c);
+  expect(() => requirePrivateCharacterAccess(record, repo.identity.user(admin))).toThrow(
+    'Najpierw odkryj',
+  );
+  expect(() =>
+    requirePrivateCharacterAccess(record, repo.identity.user(admin), true),
+  ).not.toThrow();
+  for (const actor of [a, gm])
+    expect(() => requirePrivateCharacterAccess(record, repo.identity.user(actor))).not.toThrow();
+  const own = repo.create(admin, c.name, c);
+  expect(characterForViewer(own, repo.identity.user(admin))).toEqual(own);
+  expect(() => requirePrivateCharacterAccess(own, repo.identity.user(admin))).not.toThrow();
+  c.privacy.statistics = false;
+  expect(() =>
+    requirePrivateCharacterAccess({ ...record, document: c }, repo.identity.user(admin)),
+  ).not.toThrow();
+});
+
+it('loads pre-statistics privacy without changing existing flags', () => {
+  const c = newCharacter();
+  const old = { ...c, privacy: { background: true, origin: false, equipment: true } };
+  expect(characterSchema.parse(old).privacy).toEqual({ ...old.privacy, statistics: false });
 });
 it('players submit pending entries; only GM/admin approve, with stale review protection and owner resubmission', () => {
   const doc = { category: 'Narzędzia', source: 'Gracz', item: { ...newItem(), name: 'Wiertło' } };

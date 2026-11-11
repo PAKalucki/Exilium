@@ -78,6 +78,7 @@ export const advanceChoice = z
   .strict();
 export const privacySchema = z
   .object({
+    statistics: z.boolean().default(false),
     background: z.boolean().default(false),
     origin: z.boolean().default(false),
     equipment: z.boolean().default(false),
@@ -96,7 +97,12 @@ export type VisibleStats = {
 export const characterSchema = z
   .object({
     schemaVersion: z.literal(1),
-    privacy: privacySchema.default({ background: false, origin: false, equipment: false }),
+    privacy: privacySchema.default({
+      statistics: false,
+      background: false,
+      origin: false,
+      equipment: false,
+    }),
     ruleset: z.literal(RULESET),
     name: short.min(1),
     age: short,
@@ -208,7 +214,7 @@ export type CharacterRecord = {
 export function newCharacter(name = 'Nowa postać'): Character {
   return {
     schemaVersion: 1,
-    privacy: { background: false, origin: false, equipment: false },
+    privacy: { statistics: false, background: false, origin: false, equipment: false },
     ruleset: RULESET,
     name,
     age: '',
