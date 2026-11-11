@@ -17,7 +17,13 @@
     validateCreation,
     earnedAdvances,
   } from '../rules/engine';
-  import type { Character, Item } from '../rules/model';
+  import {
+    characterCategoryLabels,
+    type Character,
+    type CharacterCategory,
+    type Item,
+  } from '../rules/model';
+  import { changeCharacterCategory } from '../rules/categories';
   import ItemEditor from './ItemEditor.svelte';
   import ArchetypePicker from './ArchetypePicker.svelte';
   import PortraitPicker from './PortraitPicker.svelte';
@@ -34,14 +40,19 @@
     onchange,
     onupload,
     onremove,
+    canCreateExtras = false,
+    allowCategoryChange = true,
   }: {
     character: Character;
     characterId: string;
     onchange: () => void;
     onupload: (file: File) => Promise<boolean>;
     onremove: () => void;
+    canCreateExtras?: boolean;
+    allowCategoryChange?: boolean;
   } = $props();
   let step = $state(0),
+    categoryError = $state(''),
     newEdge = $state(edges[0].id),
     newHindrance = $state(hindrances[0].id),
     knowledge = $state(''),
@@ -61,6 +72,7 @@
   ];
   let budget = $derived(creationBudget(character)),
     issues = $derived(validateCreation(character));
+  let extra = $derived(character.category === 'extra');
   let visibleEdges = $derived(
     edges
       .filter((e) => ruleSearch(e.name).includes(ruleSearch(search)))
@@ -142,10 +154,43 @@
         <p class="eyebrow">KROK {step + 1} / {steps.length}</p>
         <h2>{steps[step]}</h2>
       </div>
-      <span class="small muted">Człowiek · Exilium</span>
+      <span class="small muted"
+        >{characterCategoryLabels[character.category]} · Człowiek · Exilium</span
+      >
     </div>
     {#if step === 0}
       <p class="muted">Kim jesteś, zanim padnie pierwszy strzał?</p>
+      <section class="panel" aria-label="Kategoria postaci">
+        <label
+          >Kategoria postaci<select
+            value={character.category}
+            disabled={!canCreateExtras || !allowCategoryChange || !!character.legacy}
+            oninput={(event) => event.stopPropagation()}
+            onchange={(event) => {
+              event.stopPropagation();
+              categoryError = '';
+              try {
+                character = changeCharacterCategory(
+                  character,
+                  event.currentTarget.value as CharacterCategory,
+                );
+                onchange();
+              } catch (error) {
+                categoryError = (error as Error).message;
+              }
+            }}
+          >
+            <option value="wildCard">Figura (Wild Card)</option>
+            {#if canCreateExtras || extra}<option value="extra">Blotka (Extra) — tylko MG</option
+              >{/if}
+          </select></label
+        >
+        <p class="small muted">
+          Figura to postać gracza lub główny przeciwnik. Blotki to postacie drugoplanowe i
+          przeciwnicy o statystykach ustalanych przez MG; ich szczegóły są domyślnie prywatne.
+        </p>
+        {#if categoryError}<p class="error" role="alert">{categoryError}</p>{/if}
+      </section>
       <ArchetypePicker bind:character {onchange} />
       <PortraitPicker {characterId} portraitId={character.portraitId} {onupload} {onremove} />
       <div class="form-grid">
@@ -195,76 +240,77 @@
           maxlength="12000"
           placeholder="Ludzie, miejsca i decyzje, które cię ukształtowały."></textarea></label
       >
-      <details class="legacy-details">
-        <summary>Wpisuję istniejącą postać</summary>
-        <p class="small muted">
-          Jeśli nie znasz pełnej historii rozwoju, zapisz obecne statystyki jako podstawę.
-          Historycznie wydane rozwinięcia nie zostaną przyznane ponownie.
-        </p>
-        <label class="check-label"
-          ><input
-            type="checkbox"
-            checked={!!character.legacy}
-            onchange={(e) => {
-              character.legacy = e.currentTarget.checked
-                ? {
-                    xp: 0,
-                    spent: 0,
-                    attributeUsed: false,
-                    lastLegendaryAttribute: null,
-                    reason: 'Przepisanie istniejącej karty',
-                  }
-                : null;
-              onchange();
-            }}
-          /> Użyj istniejącej karty jako podstawy</label
-        >{#if character.legacy}<div class="form-grid">
+      {#if !extra}<details class="legacy-details">
+          <summary>Wpisuję istniejącą postać</summary>
+          <p class="small muted">
+            Jeśli nie znasz pełnej historii rozwoju, zapisz obecne statystyki jako podstawę.
+            Historycznie wydane rozwinięcia nie zostaną przyznane ponownie.
+          </p>
+          <label class="check-label"
+            ><input
+              type="checkbox"
+              checked={!!character.legacy}
+              onchange={(e) => {
+                character.legacy = e.currentTarget.checked
+                  ? {
+                      xp: 0,
+                      spent: 0,
+                      attributeUsed: false,
+                      lastLegendaryAttribute: null,
+                      reason: 'Przepisanie istniejącej karty',
+                    }
+                  : null;
+                onchange();
+              }}
+            /> Użyj istniejącej karty jako podstawy</label
+          >{#if character.legacy}<div class="form-grid">
+              <label
+                >Obecne PD<input
+                  type="number"
+                  bind:value={character.legacy.xp}
+                  min="0"
+                  required
+                /></label
+              ><label
+                >Historycznie wydane rozwinięcia<input
+                  type="number"
+                  bind:value={character.legacy.spent}
+                  min="0"
+                  max={earnedAdvances(character.legacy.xp)}
+                  required
+                /></label
+              ><label class="check-label"
+                ><input type="checkbox" bind:checked={character.legacy.attributeUsed} /> Cecha zwiększona
+                na obecnej Randze</label
+              ><label
+                >Numer ostatniego zwiększenia cechy (Legenda)<input
+                  type="number"
+                  value={character.legacy.lastLegendaryAttribute ?? ''}
+                  oninput={(e) => {
+                    if (character.legacy)
+                      character.legacy.lastLegendaryAttribute =
+                        e.currentTarget.value === '' ? null : Number(e.currentTarget.value);
+                  }}
+                  min="0"
+                  max={character.legacy.spent}
+                /></label
+              >
+            </div>
             <label
-              >Obecne PD<input
-                type="number"
-                bind:value={character.legacy.xp}
-                min="0"
-                required
-              /></label
-            ><label
-              >Historycznie wydane rozwinięcia<input
-                type="number"
-                bind:value={character.legacy.spent}
-                min="0"
-                max={earnedAdvances(character.legacy.xp)}
-                required
-              /></label
-            ><label class="check-label"
-              ><input type="checkbox" bind:checked={character.legacy.attributeUsed} /> Cecha zwiększona
-              na obecnej Randze</label
-            ><label
-              >Numer ostatniego zwiększenia cechy (Legenda)<input
-                type="number"
-                value={character.legacy.lastLegendaryAttribute ?? ''}
-                oninput={(e) => {
-                  if (character.legacy)
-                    character.legacy.lastLegendaryAttribute =
-                      e.currentTarget.value === '' ? null : Number(e.currentTarget.value);
-                }}
-                min="0"
-                max={character.legacy.spent}
+              >Uzasadnienie podstawy<input
+                bind:value={character.legacy.reason}
+                minlength="3"
+                maxlength="160"
               /></label
             >
-          </div>
-          <label
-            >Uzasadnienie podstawy<input
-              bind:value={character.legacy.reason}
-              minlength="3"
-              maxlength="160"
-            /></label
-          >
-          <div class="form-grid">
-            <label>Obecna gotówka<input type="number" bind:value={character.cash} min="0" /></label
-            ><label
-              >Obecne kredyty<input type="number" bind:value={character.credits} min="0" /></label
-            >
-          </div>{/if}
-      </details>
+            <div class="form-grid">
+              <label
+                >Obecna gotówka<input type="number" bind:value={character.cash} min="0" /></label
+              ><label
+                >Obecne kredyty<input type="number" bind:value={character.credits} min="0" /></label
+              >
+            </div>{/if}
+        </details>{/if}
     {:else if step === 1}
       <div class="beginner-guide">
         <div class="help-heading">
@@ -276,13 +322,17 @@
           kości pasujące do swojej roli w drużynie; znak „?” wyjaśnia zastosowania.
         </p>
       </div>
-      <div class="budget-banner">
-        <span>Punkty na cechy</span><strong
-          class:over-budget={budget.attributeSpent > budget.attributeTotal}
-          >{budget.attributeSpent} <small>/ {budget.attributeTotal}</small></strong
-        >
-      </div>
-      <p class="muted">Każda cecha zaczyna od k4. Jeden punkt podnosi ją o jeden rodzaj kości.</p>
+      {#if !extra}<div class="budget-banner">
+          <span>Punkty na cechy</span><strong
+            class:over-budget={budget.attributeSpent > budget.attributeTotal}
+            >{budget.attributeSpent} <small>/ {budget.attributeTotal}</small></strong
+          >
+        </div>
+        <p class="muted">Każda cecha zaczyna od k4. Jeden punkt podnosi ją o jeden rodzaj kości.</p>
+      {:else}<p class="notice">
+          Wybierz cechy potrzebne tej Blotce. MG ustala je bez rozliczania punktów tworzenia
+          postaci.
+        </p>{/if}
       <div class="attribute-editor">
         {#each Object.entries(attributes) as [key, label]}<div class="attribute-row">
             <div class="attribute-explanation">
@@ -319,20 +369,22 @@
           placeholder="Nazwa, np. Czujny, McGyver lub Pomysłowy Dobromir"
         /></label
       >
-      <div class="budget-banner">
-        <span>Wydane punkty z zawad</span><strong
-          class:over-budget={budget.spentHindrance > budget.hindrancePoints}
-          >{budget.spentHindrance}<small> / {budget.hindrancePoints}</small></strong
-        >
-      </div>
+      {#if !extra}<div class="budget-banner">
+          <span>Wydane punkty z zawad</span><strong
+            class:over-budget={budget.spentHindrance > budget.hindrancePoints}
+            >{budget.spentHindrance}<small> / {budget.hindrancePoints}</small></strong
+          >
+        </div>{:else}<p class="notice">
+          Przewagi i zawady są opcjonalne. MG wybiera zdolności pasujące do roli Blotki.
+        </p>{/if}
       <div class="split-panel">
         <div>
           <h3>
             Zawady <span class="muted small">{visibleHindrances.length} z {hindrances.length}</span>
           </h3>
-          <p class="small muted">
-            Punkty przyznają maksymalnie dwie drobne i jedna poważna zawada.
-          </p>
+          {#if !extra}<p class="small muted">
+              Punkty przyznają maksymalnie dwie drobne i jedna poważna zawada.
+            </p>{/if}
           <div class="inline-fields">
             <select aria-label="Wybierz zawadę" bind:value={newHindrance}
               >{#each visibleHindrances as h}<option value={h.id}>{h.name}</option>{/each}</select
@@ -379,9 +431,9 @@
         </div>
         <div>
           <h3>Przewagi <span class="muted small">{visibleEdges.length} z {edges.length}</span></h3>
-          <p class="small muted">
-            Człowiek otrzymuje jedną darmową przewagę. Kolejne kosztują po dwa punkty z zawad.
-          </p>
+          {#if !extra}<p class="small muted">
+              Człowiek otrzymuje jedną darmową przewagę. Kolejne kosztują po dwa punkty z zawad.
+            </p>{/if}
           <div class="inline-fields">
             <select aria-label="Wybierz przewagę" bind:value={newEdge}
               >{#each visibleEdges as e}<option value={e.id}>{e.name}</option>{/each}</select
@@ -465,47 +517,53 @@
                 </p>{/if}
             </article>{/each}
         </details>{/if}
-      <h3>Pozostałe korzyści z zawad</h3>
-      <div class="form-grid three">
-        <label
-          >Dodatkowe punkty cech (po 2 pkt)<input
-            type="number"
-            min="0"
-            max="2"
-            bind:value={character.build.bonus.attributes}
-          /></label
-        ><label
-          >Dodatkowe punkty umiejętności<input
-            type="number"
-            min="0"
-            max="4"
-            bind:value={character.build.bonus.skills}
-          /></label
-        ><label
-          >Dodatkowe początkowe fundusze<input
-            type="number"
-            min="0"
-            max="4"
-            bind:value={character.build.bonus.funds}
-          /></label
-        >
-      </div>
+      {#if !extra}<h3>Pozostałe korzyści z zawad</h3>
+        <div class="form-grid three">
+          <label
+            >Dodatkowe punkty cech (po 2 pkt)<input
+              type="number"
+              min="0"
+              max="2"
+              bind:value={character.build.bonus.attributes}
+            /></label
+          ><label
+            >Dodatkowe punkty umiejętności<input
+              type="number"
+              min="0"
+              max="4"
+              bind:value={character.build.bonus.skills}
+            /></label
+          ><label
+            >Dodatkowe początkowe fundusze<input
+              type="number"
+              min="0"
+              max="4"
+              bind:value={character.build.bonus.funds}
+            /></label
+          >
+        </div>
+      {/if}
     {:else if step === 3}
       <div class="help-heading section-help">
-        <span>Kupujesz umiejętności, nie dodajesz do nich cechy.</span><HelpPopover
-          help={playerHelp.skills}
-        /><HelpPopover help={playerHelp.dice} />
+        <span
+          >{extra
+            ? 'Wybierz umiejętności potrzebne tej Blotce.'
+            : 'Kupujesz umiejętności, nie dodajesz do nich cechy.'}</span
+        ><HelpPopover help={playerHelp.skills} /><HelpPopover help={playerHelp.dice} />
       </div>
-      <div class="budget-banner">
-        <span>Punkty umiejętności</span><strong
-          class:over-budget={budget.skillSpent > budget.skillTotal}
-          >{budget.skillSpent}<small> / {budget.skillTotal}</small></strong
-        >
-      </div>
-      <p class="muted">
-        Kość do poziomu związanej cechy kosztuje 1 punkt. Wyższa — 2 punkty. Wiedza ogólna korzysta
-        ze Sprytu.
-      </p>
+      {#if !extra}<div class="budget-banner">
+          <span>Punkty umiejętności</span><strong
+            class:over-budget={budget.skillSpent > budget.skillTotal}
+            >{budget.skillSpent}<small> / {budget.skillTotal}</small></strong
+          >
+        </div>
+        <p class="muted">
+          Kość do poziomu związanej cechy kosztuje 1 punkt. Wyższa — 2 punkty. Wiedza ogólna
+          korzysta ze Sprytu.
+        </p>{:else}<p class="notice">
+          MG ustala kości umiejętności bez budżetu punktów. Blotka nie rzuca indywidualną Kością
+          Figury.
+        </p>{/if}
       <div class="skill-editor">
         {#each [...skills, ...Object.keys(character.build.skills)
             .filter((k) => k.startsWith('knowledge:'))
@@ -577,16 +635,32 @@
       {#if knowledgeError}<p class="error" role="alert">{knowledgeError}</p>{/if}
       {#if knowledgeMessage}<p class="small muted" role="status">{knowledgeMessage}</p>{/if}
     {:else if step === 4}
-      <div class="budget-banner">
-        <span>Ekwipunek / dostępne fundusze</span><strong
-          class:over-budget={equipmentCost(character) > startingFunds(character)}
-          >{equipmentCost(character)}<small> / {startingFunds(character)} $</small></strong
-        >
-      </div>
-      <p class="muted">
-        Bazowy budżet Exilium: 400 $. Zapisuj również wodę, racje, amunicję i ogniwa. Własne
-        przedmioty oraz kończyny cybernetyczne możesz dodać opisowo.
-      </p>
+      {#if !extra}<div class="budget-banner">
+          <span>Ekwipunek / dostępne fundusze</span><strong
+            class:over-budget={equipmentCost(character) > startingFunds(character)}
+            >{equipmentCost(character)}<small> / {startingFunds(character)} $</small></strong
+          >
+        </div>
+        <p class="muted">
+          Bazowy budżet Exilium: 400 $. Zapisuj również wodę, racje, amunicję i ogniwa. Własne
+          przedmioty oraz kończyny cybernetyczne możesz dodać opisowo.
+        </p>{:else}
+        <p class="notice">
+          MG dobiera wyposażenie Blotki według jej roli. Nie obowiązuje budżet zakupów postaci
+          gracza.
+        </p>
+        <div class="form-grid">
+          <label
+            >Gotówka przy postaci<input type="number" min="0" bind:value={character.cash} /></label
+          ><label
+            >Kredyty przy postaci<input
+              type="number"
+              min="0"
+              bind:value={character.credits}
+            /></label
+          >
+        </div>
+      {/if}
       {#each character.inventory as item, i}<div class="inventory-row">
           <div>
             <b>{item.name}</b><small>{item.quantity} szt. · {item.price * item.quantity} $</small>
@@ -605,23 +679,36 @@
           >+ Dodaj przedmiot</button
         >{/if}
     {:else}
-      <p class="muted">
-        Sprawdź wybory. Decyzje MG możesz zapisać w zakładce „Decyzje MG”. Po zatwierdzeniu nowe
-        umiejętności i cechy rozwijasz przez „Rozwój”.
-      </p>
-      <div class="summary-grid">
-        <div><small>Cechy</small><b>{budget.attributeSpent} / {budget.attributeTotal}</b></div>
-        <div><small>Umiejętności</small><b>{budget.skillSpent} / {budget.skillTotal}</b></div>
-        <div>
-          <small>Fundusze po zakupach</small><b
-            >{character.legacy
-              ? character.cash
-              : startingFunds(character) - equipmentCost(character)} $</b
-          >
+      {#if extra}<p class="muted">
+          Sprawdź statystyki i wyposażenie Blotki. MG może później zmienić je w zakładce Statystyki
+          Blotki.
+        </p>
+        <div class="summary-grid">
+          <div><small>Kategoria</small><b>Blotka</b></div>
+          <div><small>Umiejętności</small><b>{Object.keys(character.build.skills).length}</b></div>
+          <div><small>Przedmioty</small><b>{character.inventory.length}</b></div>
         </div>
-      </div>
+      {:else}
+        <p class="muted">
+          Sprawdź wybory. Decyzje MG możesz zapisać w zakładce „Decyzje MG”. Po zatwierdzeniu nowe
+          umiejętności i cechy rozwijasz przez „Rozwój”.
+        </p>
+        <div class="summary-grid">
+          <div><small>Cechy</small><b>{budget.attributeSpent} / {budget.attributeTotal}</b></div>
+          <div><small>Umiejętności</small><b>{budget.skillSpent} / {budget.skillTotal}</b></div>
+          <div>
+            <small>Fundusze po zakupach</small><b
+              >{character.legacy
+                ? character.cash
+                : startingFunds(character) - equipmentCost(character)} $</b
+            >
+          </div>
+        </div>
+      {/if}
       {#if issues.length === 0}<p class="success">
-          Wybory są zgodne z regułami. Możesz zatwierdzić postać.
+          {allowCategoryChange
+            ? 'Wybory są zgodne z regułami. Możesz zatwierdzić postać.'
+            : 'Statystyki Blotki można dalej edytować.'}
         </p>{/if}{#each issues as i}<div class:waived={i.waived} class="validation-message">
           <b>{i.waived ? 'Decyzja MG' : 'Do sprawdzenia'}</b><span>{i.message}</span>
         </div>{/each}
@@ -630,7 +717,11 @@
       <button class="button secondary" disabled={step === 0} onclick={() => step--}>← Wstecz</button
       >{#if step < steps.length - 1}<button class="button primary" onclick={() => step++}
           >Dalej →</button
-        >{:else}<span class="small muted">Zatwierdź postać przyciskiem u góry karty.</span>{/if}
+        >{:else}<span class="small muted"
+          >{allowCategoryChange
+            ? 'Zatwierdź postać przyciskiem u góry karty.'
+            : 'Zmiany zapisują się automatycznie.'}</span
+        >{/if}
     </div>
   </div>
 </div>

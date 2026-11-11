@@ -14,7 +14,7 @@ export function POST({ locals, params, url }: import('./$types').RequestEvent) {
       locals.user,
       url.searchParams.get('revealPrivate') === '1',
     );
-    if (source.status !== 'draft') {
+    if (source.status !== 'draft' && c.category !== 'extra') {
       c.build = effectiveBuild(c) as typeof c.build;
       const last = c.advances.findLastIndex((a) => a.kind === 'attribute' && a.rank === 4);
       c.legacy = {

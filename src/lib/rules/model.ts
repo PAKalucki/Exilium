@@ -5,6 +5,12 @@ const short = z.string().trim().max(160);
 const note = z.string().max(12000);
 const die = z.union([z.literal(4), z.literal(6), z.literal(8), z.literal(10), z.literal(12)]);
 const amount = z.number().int().min(0).max(100_000_000);
+export const characterCategorySchema = z.enum(['wildCard', 'extra']);
+export type CharacterCategory = z.infer<typeof characterCategorySchema>;
+export const characterCategoryLabels: Record<CharacterCategory, string> = {
+  wildCard: 'Figura',
+  extra: 'Blotka',
+};
 export const edgeChoice = z.object({ id: short.min(1), target: short.default('') }).strict();
 export const buildSchema = z
   .object({
@@ -97,6 +103,7 @@ export type VisibleStats = {
 export const characterSchema = z
   .object({
     schemaVersion: z.literal(1),
+    category: characterCategorySchema.default('wildCard'),
     privacy: privacySchema.default({
       statistics: false,
       background: false,
@@ -185,6 +192,18 @@ export const characterSchema = z
   })
   .strict()
   .superRefine((c, ctx) => {
+    if (c.category === 'extra') {
+      if (c.legacy || c.xp.length || c.advances.length)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Blotka nie korzysta z PD, rozwinięć ani historycznej podstawy.',
+        });
+      if (c.conditions.wounds > 1 || c.conditions.bennies !== 0)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Blotka ma najwyżej jedną Ranę i korzysta z puli fuksów MG.',
+        });
+    }
     if (c.inventory.length !== new Set(c.inventory.map((i) => i.id)).size)
       ctx.addIssue({ code: 'custom', message: 'Powtórzony przedmiot' });
     if (
@@ -211,10 +230,19 @@ export type CharacterRecord = {
   redacted?: HiddenSection[];
   visibleStats?: VisibleStats;
 };
-export function newCharacter(name = 'Nowa postać'): Character {
+export function newCharacter(
+  name = 'Nowa postać',
+  category: CharacterCategory = 'wildCard',
+): Character {
   return {
     schemaVersion: 1,
-    privacy: { statistics: false, background: false, origin: false, equipment: false },
+    category,
+    privacy: {
+      statistics: category === 'extra',
+      background: category === 'extra',
+      origin: category === 'extra',
+      equipment: category === 'extra',
+    },
     ruleset: RULESET,
     name,
     age: '',
@@ -237,8 +265,14 @@ export function newCharacter(name = 'Nowa postać'): Character {
       bonus: { attributes: 0, skills: 0, funds: 0 },
     },
     legacy: null,
-    conditions: { wounds: 0, fatigue: 0, shaken: false, incapacitated: false, bennies: 3 },
-    cash: 400,
+    conditions: {
+      wounds: 0,
+      fatigue: 0,
+      shaken: false,
+      incapacitated: false,
+      bennies: category === 'extra' ? 0 : 3,
+    },
+    cash: category === 'extra' ? 0 : 400,
     credits: 0,
     inventory: [],
     xp: [],

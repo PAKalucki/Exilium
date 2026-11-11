@@ -58,10 +58,16 @@
   {#if v.statisticsHidden}
     <p>Statystyki ukryte — zapytaj w grze.</p>
   {:else}<div class="advancement-strip">
-      <span><b>Ranga</b> {v.rank}</span>
-      <span><b>Doświadczenie</b> {v.experience} PD</span>
-      <span><b>Niewydane rozwinięcia</b> {v.unspentAdvances}</span>
-      <span><b>Kość Figury</b> k6</span>
+      {#if v.extra}
+        <span><b>Kategoria</b> Blotka (Extra)</span><span
+          >Bez indywidualnej Kości Figury · Fuksy z puli MG</span
+        >
+      {:else}
+        <span><b>Ranga</b> {v.rank}</span>
+        <span><b>Doświadczenie</b> {v.experience} PD</span>
+        <span><b>Niewydane rozwinięcia</b> {v.unspentAdvances}</span>
+        <span><b>Kość Figury</b> k6</span>
+      {/if}
     </div>{/if}
   <div class="print-columns">
     <section class="traits-column" aria-labelledby="print-traits">
@@ -158,7 +164,7 @@
         </section>
         <section class="session-section" aria-labelledby="print-session">
           <h2 id="print-session">Podczas sesji</h2>
-          {#each [{ label: 'Rany', count: v.session.wounds, max: 3 }, { label: 'Zmęczenie', count: v.session.fatigue, max: 3 }] as track}
+          {#each [{ label: 'Rany', count: v.session.wounds, max: v.session.maxWounds }, { label: 'Zmęczenie', count: v.session.fatigue, max: 3 }] as track}
             <div class="condition-line">
               <b>{track.label}</b>
               <span class="condition-boxes" aria-hidden="true">
@@ -170,9 +176,10 @@
             </div>
           {/each}
           <div class="condition-line">
-            <b>Szok</b><span>{v.session.shaken ? 'TAK' : 'NIE'}</span><b>Fuksy</b><span
-              class="benny-count">{v.session.bennies}</span
-            >
+            <b>Szok</b><span>{v.session.shaken ? 'TAK' : 'NIE'}</span><b>Fuksy</b>
+            {#if v.extra}<span>Pula MG</span>{:else}<span class="benny-count"
+                >{v.session.bennies}</span
+              >{/if}
           </div>
           <p class="condition-summary">
             Kara za Rany i Zmęczenie: −{v.session.penalty}{#if v.session.incapacitated}<br /><b

@@ -5,6 +5,7 @@ Every new Discord guild member signs in as **Gracz** (`player`). `DEPLOYMENT_ADM
 | Capability                                           | Gracz                     | MG (`gm`)             | Administrator                              |
 | ---------------------------------------------------- | ------------------------- | --------------------- | ------------------------------------------ |
 | Create and edit own sheets                           | Yes                       | Yes                   | Yes                                        |
+| Create Blotki / assign their statistics              | No                        | Yes                   | No; requires the MG role                   |
 | Read other sheets                                    | With privacy applied      | Full                  | Privacy applied; explicit reveal available |
 | Edit another person's sheet                          | No                        | Yes                   | Reveal private sections first              |
 | Submit an item                                       | Pending approval          | Published immediately | Published immediately                      |
@@ -15,6 +16,14 @@ Every new Discord guild member signs in as **Gracz** (`player`). `DEPLOYMENT_ADM
 
 The administrator uses `/users` to assign roles and enable/disable accounts after the person has signed in once. Changes are audited. A stale account change is rejected. The last active administrator cannot be disabled or demoted. Disabling an account invalidates its sessions and personal API tokens. Roles are read from the database for each session/token request, so changing a role also changes existing sessions and tokens immediately. GM edits retain the sheet's creator and record the GM's own actor ID.
 
+## Character categories
+
+New and existing ordinary sheets are **Figura (Wild Card)**. Only the **MG** role can create **Blotka (Extra)** sheets, copy an Extra, or choose either category during initial creation. Administrator alone does not grant this capability. Category changes are restricted to drafts without XP, advances or a historical baseline; an active character's category stays fixed. The main list filters by all categories, Figury or Blotki, combined with creator and archive filters. Category remains public when statistics are private.
+
+Blotki use simplified creation without player point budgets, free-human-Edge requirements, rank/prerequisite checks or a starting-equipment allowance. Known mundane catalog choices and valid document structure are still required. The GM can edit their stats directly after activation using **Statystyki Blotki**; they do not use XP, advances or historical baselines. Admin can manage an Extra's profile, equipment, conditions, privacy and archive status after revealing private details, but cannot create or replace its build. A creator demoted to Player cannot edit an Extra.
+
+New Extras and copies start with all four privacy switches enabled. Converting a draft to Extra also enables all four switches. The GM can change each independently in Settings afterward. Owners and MG retain full visibility; Admin uses the usual explicit reveal.
+
 ## Archiving characters
 
 Editors can choose **Archiwizuj** on a character card, **Archiwizuj postać** in the sheet header, or **Ustawienia → Zarządzanie postacią**. Archiving asks for confirmation and saves pending sheet edits first. The character leaves the current list, with its full document and change history retained. The creator filter also applies to the **Archiwum** view.
@@ -23,7 +32,7 @@ Archived cards and sheet headers offer **Przywróć postać**; Settings also off
 
 ## Privacy
 
-The **Ustawienia** tab on draft and active character sheets has four independent switches: **Ukryj statystyki**, **Ukryj historię**, **Ukryj pochodzenie**, and **Ukryj ekwipunek i zasoby**. All default to visible for new sheets. Existing privacy choices are preserved and statistics remain visible until explicitly hidden. “Historia” means the character's personal background. Statistics hiding covers attributes, skills, combat values, Edges, Hindrances, session conditions, XP, advances, legacy baselines and GM rulings/adjustments; change history is also omitted from that shared view. Equipment hiding includes inventory, cash, credits and targeted inventory references. When statistics remain public, combat totals are calculated from the full saved sheet before equipment redaction. Hiding statistics leaves independently public equipment and background visible, but omits carrying capacity and encumbrance that could disclose private traits.
+The **Ustawienia** tab on draft and active character sheets has four independent switches: **Ukryj statystyki**, **Ukryj historię**, **Ukryj pochodzenie**, and **Ukryj ekwipunek i zasoby**. All default to visible for new Figury and hidden for new Blotki. Existing privacy choices are preserved and statistics on older sheets remain visible until explicitly hidden. “Historia” means the character's personal background. Statistics hiding covers attributes, skills, combat values, Edges, Hindrances, session conditions, XP, advances, legacy baselines and GM rulings/adjustments; change history is also omitted from that shared view. Equipment hiding includes inventory, cash, credits and targeted inventory references. When statistics remain public, combat totals are calculated from the full saved sheet before equipment redaction. Hiding statistics leaves independently public equipment and background visible, but omits carrying capacity and encumbrance that could disclose private traits.
 
 Other players and, by default, administrators see placeholders. The actual hidden content is removed server-side from page data, list/detail API responses, print views and PDF exports. The creator and MG always see full content. Independently written session notes and motivations remain public; avoid copying a secret into another field if it should stay private.
 

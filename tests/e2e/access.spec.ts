@@ -336,6 +336,14 @@ test('hiding statistics on an active sheet redacts the admin save response and r
   await page.goto(`/characters/${record.id}`);
   await expect(page.locator('.rank-pill')).toBeVisible();
   await page.getByRole('button', { name: 'Ustawienia', exact: true }).click();
+  let savedBody = '';
+  await page.route(`${origin}/api/characters/${record.id}`, async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const response = await route.fetch();
+    // The app reloads into its private view immediately after this response.
+    savedBody = await response.text();
+    await route.fulfill({ response });
+  });
   const saving = page.waitForResponse(
     (response) =>
       response.url() === `${origin}/api/characters/${record.id}` &&
@@ -344,7 +352,7 @@ test('hiding statistics on an active sheet redacts the admin save response and r
   await page.getByLabel('Ukryj statystyki', { exact: true }).check();
   const saved = await saving;
   expect(saved.status()).toBe(200);
-  expect(await saved.text()).not.toContain('Tajemna wiedza aktywna');
+  expect(savedBody).not.toContain('Tajemna wiedza aktywna');
   await expect(page.getByRole('note', { name: 'Statystyki: ukryte' })).toBeVisible();
   await expect(page.locator('.rank-pill, .stat-tile, .sheet-tabs')).toHaveCount(0);
   await expect(page.getByText(doc.background, { exact: true })).toBeVisible();

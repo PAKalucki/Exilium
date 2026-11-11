@@ -12,9 +12,11 @@
     message = $state(''),
     error = $state('');
   let selected = $derived(archetypes.find((entry) => entry.id === selectedId));
-  let budget = $derived(
-    selected ? creationBudget({ ...newCharacter(), build: selected.build }) : null,
+  let extra = $derived(character.category === 'extra');
+  let preview = $derived(
+    selected ? applyArchetype(newCharacter('Podgląd', character.category), selected.id) : null,
   );
+  let budget = $derived(preview ? creationBudget(preview) : null);
   let existingCharacter = $derived(
     !!character.legacy || !!character.xp.length || !!character.advances.length,
   );
@@ -26,7 +28,7 @@
     const currentBuild = JSON.stringify(character.build);
     if (
       currentBuild !== emptyBuild &&
-      currentBuild !== JSON.stringify(selected.build) &&
+      currentBuild !== JSON.stringify(preview?.build) &&
       !confirm(
         'Wczytać archetyp? Zastąpi to cechy, umiejętności, przewagi, zawady i przydział punktów w tym szkicu. Imię, opis, portret, ekwipunek i ustawienia prywatności zostaną zachowane.',
       )
@@ -35,7 +37,9 @@
     try {
       character = applyArchetype(character, selected.id);
       onchange();
-      message = `Wczytano archetyp: ${selected.name}. Dobierz zawady, wydaj pozostałe punkty umiejętności i wybierz ekwipunek.`;
+      message = extra
+        ? `Wczytano archetyp: ${selected.name}. MG może swobodnie zmienić statystyki i wyposażenie Blotki.`
+        : `Wczytano archetyp: ${selected.name}. Dobierz zawady, wydaj pozostałe punkty umiejętności i wybierz ekwipunek.`;
     } catch (e) {
       error = (e as Error).message;
     }
@@ -71,13 +75,13 @@
       Archetypy są dostępne dla nowych postaci. Włączono wpisywanie istniejącej karty z podstawą
       rozwoju.
     </p>{/if}
-  {#if selected && budget}
+  {#if selected && budget && preview}
     <div class="archetype-preview" aria-label="Podgląd archetypu">
       <p>{selected.description}</p>
       <dl class="archetype-attributes">
         {#each Object.entries(attributes) as [key, label]}<div>
             <dt>{label}</dt>
-            <dd>{formatDie(selected.build.attributes[key as keyof typeof attributes])}</dd>
+            <dd>{formatDie(preview.build.attributes[key as keyof typeof attributes])}</dd>
           </div>{/each}
       </dl>
       <h4>Umiejętności</h4>
@@ -92,12 +96,21 @@
           .map((edge) => edges.find((entry) => entry.id === edge.id)?.name || edge.id)
           .join(' · ')}
       </p>
-      {#if selected.note}<p class="notice">{selected.note}</p>{/if}
-      <p class="small muted">
-        Do wydania: <b>{budget.skillTotal - budget.skillSpent} pkt umiejętności</b>. Wzorzec
-        wykorzystuje <b>{budget.spentHindrance} pkt z zawad</b>. Podręcznik zakłada jedną poważną i
-        dwie drobne zawady — dobierzesz je w kroku 3. Ekwipunek wybierzesz osobno z budżetu 400 $.
-      </p>
+      {#if selected.note}<p class="notice">
+          {extra && selected.id === 'brute'
+            ? 'Siła k10 według pierwowzoru z podręcznika.'
+            : selected.note}
+        </p>{/if}
+      {#if extra}<p class="small muted">
+          MG ustala statystyki i ekwipunek Blotki bez budżetu punktów i zakupów postaci gracza.
+        </p>{:else}
+        <p class="small muted">
+          Do wydania: <b>{budget.skillTotal - budget.skillSpent} pkt umiejętności</b>. Wzorzec
+          wykorzystuje <b>{budget.spentHindrance} pkt z zawad</b>. Podręcznik zakłada jedną poważną
+          i dwie drobne zawady — dobierzesz je w kroku 3. Ekwipunek wybierzesz osobno z budżetu 400
+          $.
+        </p>
+      {/if}
       <div class="archetype-actions">
         <button type="button" class="button secondary" disabled={existingCharacter} onclick={apply}
           >Wczytaj archetyp</button

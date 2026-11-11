@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { rankName, totalXp, derived as calculateStats } from '../lib/rules/engine';
   import { portraitUrl } from '../lib/portraits';
+  import { characterCategoryLabels, type CharacterCategory } from '../lib/rules/model';
   import heroLarge from '../lib/assets/exilium-hero-1536.webp';
   import heroSmall from '../lib/assets/exilium-hero-768.webp';
   let { data } = $props();
@@ -18,6 +19,8 @@
     lifecycleError = $state(''),
     showArchived = $state(false),
     ownerFilter = $state('all');
+  let categoryFilter = $state<'all' | CharacterCategory>('all');
+  let newCategory = $state<CharacterCategory>('wildCard');
   let owners = $derived(
     Array.from(new Map(data.characters.map((c) => [c.ownerId, c.ownerName])), ([id, name]) => ({
       id,
@@ -28,6 +31,7 @@
     data.characters.filter(
       (c) =>
         (showArchived ? c.status === 'archived' : c.status !== 'archived') &&
+        (categoryFilter === 'all' || c.document.category === categoryFilter) &&
         (ownerFilter === 'all' || (ownerFilter === 'mine' ? c.isOwner : c.ownerId === ownerFilter)),
     ),
   );
@@ -39,7 +43,7 @@
       const res = await fetch('/api/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, category: newCategory }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error);
@@ -191,18 +195,27 @@
           onclick={() => (showArchived = true)}>Archiwum</button
         >
       </div>
-      <label class="library-owner-filter">
-        Twórca postaci
-        <select bind:value={ownerFilter} disabled={!mounted}>
-          <option value="all">Wszystkie postacie</option>
-          <option value="mine">Moje postacie</option>
-          <optgroup label="Wybrany użytkownik">
-            {#each owners as owner (owner.id)}
-              <option value={owner.id}>{owner.name}</option>
-            {/each}
-          </optgroup>
-        </select>
-      </label>
+      <div class="library-filters">
+        <label class="library-owner-filter">
+          Twórca postaci
+          <select bind:value={ownerFilter} disabled={!mounted}>
+            <option value="all">Wszystkie postacie</option>
+            <option value="mine">Moje postacie</option>
+            <optgroup label="Wybrany użytkownik">
+              {#each owners as owner (owner.id)}
+                <option value={owner.id}>{owner.name}</option>
+              {/each}
+            </optgroup>
+          </select>
+        </label>
+        <label
+          >Kategoria postaci<select bind:value={categoryFilter} disabled={!mounted}>
+            <option value="all">Wszystkie kategorie</option><option value="wildCard"
+              >Figury (Wild Cards)</option
+            ><option value="extra">Blotki (Extras)</option>
+          </select></label
+        >
+      </div>
     </div>
     {#if lifecycleError}<p class="error library-feedback" role="alert">{lifecycleError}</p>{/if}
     {#if lifecycleMessage}<p class="notice library-feedback" role="status">
@@ -227,6 +240,7 @@
                     ? 'AKTYWNA'
                     : 'ARCHIWUM'}</span
               ><span class="card-id">EX / {character.id.slice(0, 6).toUpperCase()}</span>
+              <span class="character-category">{characterCategoryLabels[c.category]}</span>
             </div>
             <div class="character-monogram" aria-hidden="true">
               {#if c.portraitId}<img
@@ -248,7 +262,8 @@
                     : 'MG / administrator · możesz edytować'
                   : 'Tylko do odczytu'}
               </p>
-              {#if !character.redacted?.includes('statistics')}<span class="muted small"
+              {#if c.category !== 'extra' && !character.redacted?.includes('statistics')}<span
+                  class="muted small"
                   >{rankName(totalXp(c))} <span class="dot-separator">/</span> {totalXp(c)} PD</span
                 >{/if}
             </div>
@@ -292,6 +307,16 @@
           <span class="plus-circle" aria-hidden="true">+</span>
           <h2>Nowa historia</h2>
           <p>Stwórz człowieka, którego<br />Exilium jeszcze nie zna.</p>
+          {#if data.canCreateExtras}<label
+              >Kategoria nowej postaci<select
+                bind:value={newCategory}
+                disabled={!mounted || creating}
+              >
+                <option value="wildCard">Figura (Wild Card)</option><option value="extra"
+                  >Blotka (Extra) — tylko MG</option
+                >
+              </select></label
+            >{:else}<p class="small muted">Figura (Wild Card)</p>{/if}
           <label class="sr-only" for="new-name">Imię nowej postaci</label><input
             id="new-name"
             placeholder="Imię postaci"

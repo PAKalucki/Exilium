@@ -1,7 +1,8 @@
 # Application validation
 
-The application has 101 unit/integration tests and 23 Chromium workflows. Run the commands in [README](../README.md) and inspect the matching CI result. Isolated checks do not establish the state of a hosted instance.
+The application has 146 unit/integration tests and 29 Chromium workflows. Run the commands in [README](../README.md) and inspect the matching CI result. Isolated checks do not establish the state of a hosted instance.
 
+- Categories: Figura defaults without old-record rewrites, GM-only Extra creation/conversion/copies, free NPC stat assignment and active edits, private defaults, one-wound elimination, no personal Fuksy or XP, category filters and compact print output. Player/Admin attempts and role downgrades are rejected.
 - Rules: creation budgets, the 400-dollar default, prerequisites/exceptions, rank thresholds and advancement limits. The independent title fixture accounts for all 111 book Edges and 48 Hindrances.
 - Persistence: creator/GM permissions, audit actor identity, optimistic revisions, idempotent retries, transactional counters/money/ammunition and preservation during migrations. Grenade quantities save in drafts and purchases, while weapons with ammunition counters remain individual.
 - Accounts: Player defaults, first/existing Admin bootstrap, protected/last Admin guards, stale changes, live role changes on credentials, disabling and token revocation.

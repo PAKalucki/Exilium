@@ -21,6 +21,7 @@
     validateCreation,
   } from '../../../lib/rules/engine';
   import {
+    characterCategoryLabels,
     hasAmmunitionCounters,
     type AdvanceChoice,
     type Character,
@@ -46,8 +47,17 @@
   let record = $state.raw<CharacterRecord>(untrack(() => data.record)),
     character = $state<Character>(untrack(() => clone(data.record.document)));
   let statisticsHidden = $derived(record.redacted?.includes('statistics'));
+  let extra = $derived(character.category === 'extra');
+  let maxWounds = $derived(extra ? 1 : 3);
   let history = $state(untrack(() => data.history)),
-    tab = $state(untrack(() => (data.record.status === 'draft' ? 'creator' : 'overview')));
+    tab = $state(
+      untrack(() =>
+        data.record.status === 'draft' &&
+        (data.record.document.category !== 'extra' || data.canCreateExtras)
+          ? 'creator'
+          : 'overview',
+      ),
+    );
   let mounted = $state(false);
   let busy = $state(false),
     dirty = $state(false),
@@ -58,7 +68,7 @@
   type UploadPortrait = { type: 'portrait'; file: File };
   type ClientCommand = Command | UploadPortrait;
   const isTextSave = (command: ClientCommand) =>
-    command.type === 'saveDraft' || command.type === 'profile';
+    command.type === 'saveDraft' || command.type === 'saveExtra' || command.type === 'profile';
   let actionBusy = $state(false);
   let inFlight: Promise<boolean> | null = null;
   let pending = $state.raw<{ revision: number; commandId: string; command: ClientCommand } | null>(
@@ -103,6 +113,7 @@
   const labels: Record<string, string> = {
     privacy: 'Zmiana prywatności',
     saveDraft: 'Zapis szkicu',
+    saveExtra: 'Zapis statystyk Blotki',
     finalize: 'Zatwierdzenie postaci',
     profile: 'Notatki i historia',
     tracker: 'Zmiana licznika',
@@ -268,9 +279,13 @@
         window.location.reload();
         return true;
       }
-      if (payload.command.type === 'saveDraft' || payload.command.type === 'profile') {
+      if (
+        payload.command.type === 'saveDraft' ||
+        payload.command.type === 'saveExtra' ||
+        payload.command.type === 'profile'
+      ) {
         const unchanged =
-          payload.command.type === 'saveDraft'
+          payload.command.type !== 'profile'
             ? JSON.stringify(character) === JSON.stringify(payload.command.document)
             : Object.entries(payload.command).every(
                 ([key, value]) =>
@@ -309,21 +324,23 @@
     if (inFlight) return inFlight;
     if (busy || pending || !online || conflict) return false;
     const command: Command =
-      record.status === 'draft'
+      record.status === 'draft' && (!extra || data.canCreateExtras)
         ? { type: 'saveDraft', document: clone(character) }
-        : {
-            type: 'profile',
-            name: character.name,
-            age: character.age,
-            origin: character.origin,
-            caste: character.caste,
-            profession: character.profession,
-            affiliation: character.affiliation,
-            motivation: character.motivation,
-            background: character.background,
-            appearance: character.appearance,
-            notes: character.notes,
-          };
+        : extra && data.canCreateExtras
+          ? { type: 'saveExtra', document: clone(character) }
+          : {
+              type: 'profile',
+              name: character.name,
+              age: character.age,
+              origin: character.origin,
+              caste: character.caste,
+              profession: character.profession,
+              affiliation: character.affiliation,
+              motivation: character.motivation,
+              background: character.background,
+              appearance: character.appearance,
+              notes: character.notes,
+            };
     pending = { revision: record.revision, commandId: crypto.randomUUID(), command };
     return deliver(pending);
   }
@@ -458,13 +475,14 @@
       </p>
     </div>
     <div class="sheet-actions">
+      <span class="character-category">{characterCategoryLabels[character.category]}</span>
       {#if record.status === 'archived'}<span class="badge">ARCHIWUM</span
         >{:else if record.status === 'draft'}<span class="badge">SZKIC</span
-        >{#if data.canEdit}<button
+        >{#if data.canEdit && (!extra || data.canCreateExtras)}<button
             class="button primary"
             disabled={locked}
             onclick={() => send({ type: 'finalize' })}>Zatwierdź postać →</button
-          >{/if}{:else if !statisticsHidden}<span class="rank-pill"
+          >{/if}{:else if !statisticsHidden && !extra}<span class="rank-pill"
           >{rankName(xp)} <span>/ {xp} PD</span></span
         >{/if}<a
         class="button secondary"
@@ -529,19 +547,23 @@
     <ReadOnlyCharacter {record} {history} eventLabels={labels} />
   {:else}
     <nav class="sheet-tabs" aria-label="Karta postaci" inert={!mounted}>
-      {#if record.status === 'draft'}<button
+      {#if (record.status === 'draft' && !extra) || (extra && data.canCreateExtras)}<button
           class:current={tab === 'creator'}
           onclick={() => (tab = 'creator')}
-          >Kreator <small>{budget.attributeSpent}/{budget.attributeTotal}</small></button
+          >{extra ? 'Statystyki Blotki' : 'Kreator'}
+          {#if !extra}<small>{budget.attributeSpent}/{budget.attributeTotal}</small>{/if}</button
         >{/if}<button class:current={tab === 'overview'} onclick={() => (tab = 'overview')}
         >Karta postaci</button
       ><button class:current={tab === 'equipment'} onclick={() => (tab = 'equipment')}
         >Ekwipunek <small>{character.inventory.length}</small></button
-      ><button class:current={tab === 'development'} onclick={() => (tab = 'development')}
-        >Rozwój {#if availableAdvances(character) > 0}<small class="available-badge"
-            >{availableAdvances(character)}</small
-          >{/if}</button
-      ><button class:current={tab === 'notes'} onclick={() => (tab = 'notes')}>Notatki</button
+      >{#if !extra}<button
+          class:current={tab === 'development'}
+          onclick={() => (tab = 'development')}
+          >Rozwój {#if availableAdvances(character) > 0}<small class="available-badge"
+              >{availableAdvances(character)}</small
+            >{/if}</button
+        >{/if}
+      <button class:current={tab === 'notes'} onclick={() => (tab = 'notes')}>Notatki</button
       ><button class:current={tab === 'rulings'} onclick={() => (tab = 'rulings')}
         >Decyzje MG</button
       ><button class:current={tab === 'history'} onclick={() => (tab = 'history')}>Historia</button
@@ -552,6 +574,8 @@
     <fieldset class="sheet-body" disabled={locked}>
       {#if tab === 'creator'}<Creator
           bind:character
+          canCreateExtras={data.canCreateExtras}
+          allowCategoryChange={record.status === 'draft'}
           characterId={record.id}
           onchange={changed}
           onupload={(file) => send({ type: 'portrait', file })}
@@ -587,9 +611,10 @@
                   <HelpPopover help={playerHelp.attributes} />
                 </div>
                 <div class="help-heading">
-                  <span class="small muted">Kość Figury: k6</span><HelpPopover
-                    help={playerHelp.dice}
-                  />
+                  {#if extra}<span class="small muted">Blotka · bez indywidualnej Kości Figury</span
+                    >{:else}<span class="small muted">Kość Figury: k6</span><HelpPopover
+                      help={playerHelp.dice}
+                    />{/if}
                 </div>
               </div>
               <div class="attribute-display">
@@ -674,7 +699,7 @@
               <div>
                 <div class="help-heading">
                   <h3>Rany</h3>
-                  <HelpPopover help={playerHelp.wounds} />
+                  {#if !extra}<HelpPopover help={playerHelp.wounds} />{/if}
                 </div>
                 <span>Kara −{d.woundPenalty}</span>
               </div>
@@ -683,9 +708,9 @@
                   aria-label="Zmniejsz Rany"
                   disabled={character.conditions.wounds === 0}
                   onclick={() => send({ type: 'tracker', field: 'wounds', delta: -1 })}>−</button
-                ><strong>{character.conditions.wounds}<small> / 3</small></strong><button
+                ><strong>{character.conditions.wounds}<small> / {maxWounds}</small></strong><button
                   aria-label="Zwiększ Rany"
-                  disabled={character.conditions.wounds === 3}
+                  disabled={character.conditions.wounds === maxWounds}
                   onclick={() => send({ type: 'tracker', field: 'wounds', delta: 1 })}>+</button
                 >
               </div>
@@ -714,25 +739,27 @@
                 >
               </div>
             </div>
-            <div class="tracker-block bennies-block">
-              <div>
-                <div class="help-heading">
-                  <h3>Fuksy</h3>
-                  <HelpPopover help={playerHelp.bennies} />
+            {#if !extra}<div class="tracker-block bennies-block">
+                <div>
+                  <div class="help-heading">
+                    <h3>Fuksy</h3>
+                    <HelpPopover help={playerHelp.bennies} />
+                  </div>
+                  <span>Na początek sesji: {d.bennies}</span>
                 </div>
-                <span>Na początek sesji: {d.bennies}</span>
-              </div>
-              <div class="tracker-controls">
-                <button
-                  aria-label="Wydaj fuksa"
-                  disabled={character.conditions.bennies === 0}
-                  onclick={() => send({ type: 'tracker', field: 'bennies', delta: -1 })}>−</button
-                ><strong>{character.conditions.bennies}</strong><button
-                  aria-label="Dodaj fuksa"
-                  onclick={() => send({ type: 'tracker', field: 'bennies', delta: 1 })}>+</button
-                >
-              </div>
-            </div>
+                <div class="tracker-controls">
+                  <button
+                    aria-label="Wydaj fuksa"
+                    disabled={character.conditions.bennies === 0}
+                    onclick={() => send({ type: 'tracker', field: 'bennies', delta: -1 })}>−</button
+                  ><strong>{character.conditions.bennies}</strong><button
+                    aria-label="Dodaj fuksa"
+                    onclick={() => send({ type: 'tracker', field: 'bennies', delta: 1 })}>+</button
+                  >
+                </div>
+              </div>{:else}<p class="small">
+                Jedna Rana eliminuje Blotkę. Fuksy przydziela MG ze swojej wspólnej puli.
+              </p>{/if}
             <div class="help-heading condition-help">
               <span>Stany postaci</span><HelpPopover help={playerHelp.shaken} /><HelpPopover
                 help={playerHelp.incapacitated}
@@ -749,33 +776,33 @@
                 <span aria-hidden="true">{character.conditions.shaken ? '●' : '○'}</span></span
               ></button
             ><button
-              class:state-on={character.conditions.incapacitated}
+              class:state-on={d.incapacitated}
               class="state-toggle"
-              aria-pressed={character.conditions.incapacitated}
+              aria-pressed={d.incapacitated}
+              disabled={extra && character.conditions.wounds > 0}
               onclick={() =>
                 send({
                   type: 'condition',
                   field: 'incapacitated',
                   value: !character.conditions.incapacitated,
                 })}
-              ><span>Wyeliminowanie (Rany)</span><span
-                >{character.conditions.incapacitated ? 'TAK' : 'NIE'}</span
+              ><span>Wyeliminowanie (Rany)</span><span>{d.incapacitated ? 'TAK' : 'NIE'}</span
               ></button
             >
             <p class="session-penalty">Kara z Ran i Zmęczenia <b>−{d.penalty}</b></p>
             {#if d.incapacitated}<p class="session-warning">
                 Postać jest wyeliminowana. Wynik rozstrzygnij przy stole.
-              </p>{/if}<button
-              class="button session-reset"
-              onclick={() => {
-                if (
-                  confirm(
-                    'Rozpocząć nową sesję i przywrócić początkową liczbę fuksów? Pozostałe stany pozostaną bez zmian.',
+              </p>{/if}{#if !extra}<button
+                class="button session-reset"
+                onclick={() => {
+                  if (
+                    confirm(
+                      'Rozpocząć nową sesję i przywrócić początkową liczbę fuksów? Pozostałe stany pozostaną bez zmian.',
+                    )
                   )
-                )
-                  send({ type: 'resetSession', confirmed: true });
-              }}>Nowa sesja ↗</button
-            >
+                    send({ type: 'resetSession', confirmed: true });
+                }}>Nowa sesja ↗</button
+              >{/if}
             <p class="small session-footnote">
               Liczniki zapisują się po każdej zmianie. Wyniki testów i odzyskiwanie sił
               rozstrzygacie przy stole.

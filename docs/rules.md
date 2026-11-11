@@ -15,19 +15,28 @@ The [catalog title audit](catalog-audit.md) accounts for all 111 Edge and 48 Hin
 - Cash and electronic credits are distinct currencies. No conversion rate is assumed.
 - Exactly filling the ordinary creation attribute and skill budgets is required for finalization, unless a specific ruling permits otherwise. Additional narrative Hindrances do not increase the normal credit cap.
 
+## Figura and Blotka
+
+Ordinary player characters and principal GM characters are **Figury (Wild Cards)**. Only the MG role creates **Blotki (Extras)** for supporting characters and opponents. Existing records without a category read as Figura without a database rewrite.
+
+Blotki are NPC stat blocks: the GM freely assigns mundane traits, skills, Edges, Hindrances and equipment without player budgets, rank/prerequisite checks or XP advancement. Their stats remain editable after activation. They have no individual Wild Die or personal Fuksy; the GM allocates Fuksy from the shared GM pool at the table. Group-roll exceptions and the shared pool are not automated. A single wound eliminates a Blotka, so its wound tracker has one box and no wound penalty. Fatigue, Shaken, manual elimination and equipment tracking still apply. Damage and healing remain table decisions.
+
+The Figura category keeps the existing player creation and session rules. A main GM villain can be recorded as Figura; the category does not select a controller or automatically change a GM villain's personal Fuksy allowance. Session counters remain manually adjustable.
+
 ## Source map
 
-| Source pages (printed) | Implementation                                                                                                    |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 9–10                   | Human Edge, attribute/skill budgets and costs, Hindrance spending, derived statistics                             |
-| 11–12                  | [Book archetypes for quick creation](archetypes.md), setting exclusions and the labelled Rębacz budget correction |
-| 17–23, 44              | The 2015 skill list, linked attributes, separate Knowledge specializations; Knowledge general is a Smarts test    |
-| 23–28, 45–46           | Hindrances; child/elder budgets, free Blind Edge, starting-fund and derived-stat effects                          |
-| 29–48                  | Edge names, prerequisites, professional consent and legendary trait targeting                                     |
-| 42–43                  | Rank thresholds, advancement choices and Legendary rate/frequency                                                 |
-| 49–50                  | Equipment notation and carrying capacity                                                                          |
-| 55–62                  | Manual equipment fields and the reviewed initial compendium                                                       |
-| 68–75                  | Fuksy, Shaken and wounds; tracker only, no automatic damage resolution                                            |
+| Source pages (printed) | Implementation                                                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 9–10                   | Human Edge, attribute/skill budgets and costs, Hindrance spending, derived statistics                                 |
+| 11–12                  | [Book archetypes for quick creation](archetypes.md), setting exclusions and the labelled Rębacz budget correction     |
+| 17–23, 44              | The 2015 skill list, linked attributes, separate Knowledge specializations; Knowledge general is a Smarts test        |
+| 23–28, 45–46           | Hindrances; child/elder budgets, free Blind Edge, starting-fund and derived-stat effects                              |
+| 29–48                  | Edge names, prerequisites, professional consent and legendary trait targeting                                         |
+| 42–43                  | Rank thresholds, advancement choices and Legendary rate/frequency                                                     |
+| 49–50                  | Equipment notation and carrying capacity                                                                              |
+| 55–62                  | Manual equipment fields and the reviewed initial compendium                                                           |
+| 67–69, 74, 142         | Figura/Blotka distinction, no individual Wild Die or personal Fuksy, one-wound elimination, freely assigned NPC stats |
+| 68–75                  | Fuksy, Shaken and wounds; tracker only, no automatic damage resolution                                                |
 
 Some source tables are less detailed than the full entry. The full entry takes precedence: for example, `Złota rączka` requires Niesamowita nauka and is therefore excluded, even though its summary appears mundane. `Pomysłowy Dobromir`, supernatural backgrounds, powers and magical racial options are excluded. `Niedowiarek`, `Szósty zmysł` and `Władca zwierząt` are not offered as automatic Exilium options pending an explicit mundane adaptation.
 

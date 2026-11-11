@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { DomainError, repository } from '../../../lib/server/db';
 import { characterForViewer } from '../../../lib/server/visibility';
-import { canEditCharacter } from '../../../lib/access';
+import { canCreateExtras, canEditCharacter } from '../../../lib/access';
 export function load({ locals, params, url }: import('./$types').RequestEvent) {
   if (!locals.user) redirect(303, '/');
   try {
@@ -15,7 +15,10 @@ export function load({ locals, params, url }: import('./$types').RequestEvent) {
     return {
       record: visible,
       isOwner: record.ownerId === locals.user.id,
-      canEdit: canEditCharacter(locals.user, record.ownerId) && !visible.redacted?.length,
+      canEdit:
+        canEditCharacter(locals.user, record.ownerId, record.document.category) &&
+        !visible.redacted?.length,
+      canCreateExtras: canCreateExtras(locals.user),
       canRevealPrivate,
       privateDetailsRevealed: canRevealPrivate && revealPrivate,
       history: visible.redacted?.includes('statistics') ? [] : repository().readHistory(params.id),

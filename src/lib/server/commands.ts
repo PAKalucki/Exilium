@@ -9,10 +9,12 @@ import {
   validateCreation,
 } from '../rules/engine';
 import { DomainError, type Repository } from './db';
+import { canCreateExtras } from '../access';
 
 const body = z.discriminatedUnion('type', [
   z.object({ type: z.literal('privacy'), privacy: privacySchema }).strict(),
   z.object({ type: z.literal('saveDraft'), document: characterSchema }).strict(),
+  z.object({ type: z.literal('saveExtra'), document: characterSchema }).strict(),
   z.object({ type: z.literal('finalize') }).strict(),
   z
     .object({
@@ -110,12 +112,18 @@ function fail(message: string): never {
 }
 export function execute(repo: Repository, owner: string, id: string, input: unknown) {
   const { revision, commandId, command } = commandSchema.parse(input);
+  const actor = repo.identity.user(owner);
   return repo.mutate(owner, id, revision, commandId, command, (record) => {
     let c = record.document;
+    const initialCategory = c.category,
+      initialStatus = record.status,
+      initialBuild = JSON.stringify(c.build);
     if (record.status === 'archived' && !['restore', 'undo'].includes(command.type))
       fail('Zarchiwizowana postać jest tylko do odczytu.');
     switch (command.type) {
       case 'saveDraft':
+        if (c.category === 'extra' && !canCreateExtras(actor))
+          throw new DomainError(403, 'Tylko MG ustala statystyki Blotki.');
         if (record.status !== 'draft')
           fail('Podstawa aktywnej postaci jest zamknięta. Użyj rozwinięcia lub korekty MG.');
         if (command.document.xp.length || command.document.advances.length)
@@ -123,11 +131,21 @@ export function execute(repo: Repository, owner: string, id: string, input: unkn
         record.document = command.document;
         c = record.document;
         break;
+      case 'saveExtra':
+        if (!canCreateExtras(actor))
+          throw new DomainError(403, 'Tylko MG ustala statystyki Blotki.');
+        if (c.category !== 'extra' || command.document.category !== 'extra')
+          fail('Ta operacja dotyczy statystyk Blotki.');
+        record.document = command.document;
+        c = record.document;
+        break;
       case 'finalize': {
+        if (c.category === 'extra' && !canCreateExtras(actor))
+          throw new DomainError(403, 'Tylko MG tworzy Blotki.');
         if (record.status !== 'draft') fail('Postać jest już zatwierdzona.');
         const errors = validateCreation(c).filter((i) => !i.waived);
         if (errors.length) fail(errors.map((i) => i.message).join(' '));
-        if (!c.legacy) {
+        if (!c.legacy && c.category !== 'extra') {
           c.cash = Math.max(0, startingFunds(c) - equipmentCost(c));
           c.credits = 0;
         }
@@ -147,8 +165,15 @@ export function execute(repo: Repository, owner: string, id: string, input: unkn
         break;
       }
       case 'tracker': {
+        if (c.category === 'extra' && command.field === 'bennies')
+          fail('Blotka korzysta z puli fuksów MG.');
         const next = c.conditions[command.field] + command.delta;
-        const max = command.field === 'bennies' ? 10000 : 3;
+        const max =
+          command.field === 'bennies'
+            ? 10000
+            : command.field === 'wounds' && c.category === 'extra'
+              ? 1
+              : 3;
         if (next < 0 || next > max) fail('Licznik wykracza poza dozwolony zakres.');
         c.conditions[command.field] = next;
         break;
@@ -167,7 +192,7 @@ export function execute(repo: Repository, owner: string, id: string, input: unkn
         const index = c.inventory.findIndex((i) => i.id === command.item.id);
         if (command.purchase && index >= 0)
           fail('Przedmiot już istnieje. Kolejny zakup dodaj osobno.');
-        if (command.purchase && record.status === 'active') {
+        if (command.purchase && record.status === 'active' && c.category !== 'extra') {
           const cost = command.item.price * command.item.quantity;
           if (c.cash < cost) fail('Brak gotówki na zakup.');
           c.cash -= cost;
@@ -196,6 +221,7 @@ export function execute(repo: Repository, owner: string, id: string, input: unkn
         break;
       }
       case 'xp':
+        if (c.category === 'extra') fail('Blotka nie korzysta z PD ani rozwinięć.');
         if (record.status !== 'active') fail('Najpierw zatwierdź postać.');
         c.xp.push({
           id: crypto.randomUUID(),
@@ -205,6 +231,7 @@ export function execute(repo: Repository, owner: string, id: string, input: unkn
         });
         break;
       case 'advance': {
+        if (c.category === 'extra') fail('Statystyki Blotki ustala MG bez rozwinięć.');
         if (record.status !== 'active') fail('Najpierw zatwierdź postać.');
         const preview = previewAdvance(c, command.choice),
           errors = preview.issues.filter((i) => !i.waived);
@@ -234,6 +261,25 @@ export function execute(repo: Repository, owner: string, id: string, input: unkn
         c = record.document;
         break;
     }
+    if (c.category !== initialCategory) {
+      if (!canCreateExtras(actor))
+        throw new DomainError(403, 'Tylko MG zmienia kategorię postaci.');
+      if (initialStatus !== 'draft')
+        fail('Kategorię można wybrać tylko podczas tworzenia postaci.');
+      if (c.category === 'extra') {
+        if (c.legacy || c.xp.length || c.advances.length)
+          fail('Blotka nie korzysta z podstawy rozwoju ani PD.');
+        c.privacy = { statistics: true, origin: true, background: true, equipment: true };
+        c.conditions.bennies = 0;
+        c.conditions.wounds = Math.min(1, c.conditions.wounds);
+      }
+    }
+    if (
+      c.category === 'extra' &&
+      JSON.stringify(c.build) !== initialBuild &&
+      !canCreateExtras(actor)
+    )
+      throw new DomainError(403, 'Tylko MG ustala statystyki Blotki.');
     const errors = integrityIssues(c);
     if (errors.length) fail(errors.join(' '));
   });

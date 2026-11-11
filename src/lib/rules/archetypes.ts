@@ -8,5 +8,10 @@ export function applyArchetype(character: Character, id: string): Character {
     );
   const archetype = archetypes.find((entry) => entry.id === id);
   if (!archetype) throw Error('Nie znaleziono archetypu.');
-  return { ...character, build: structuredClone(archetype.build) };
+  const build = structuredClone(archetype.build);
+  if (character.category === 'extra') {
+    build.bonus = { attributes: 0, skills: 0, funds: 0 };
+    if (id === 'brute') build.attributes.strength = 10;
+  }
+  return { ...character, build };
 }

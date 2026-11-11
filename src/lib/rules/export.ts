@@ -5,6 +5,7 @@ import {
   type Character,
   type VisibleStats,
   type HiddenSection,
+  characterCategoryLabels,
 } from './model';
 export function exportView(
   c: Character,
@@ -14,22 +15,28 @@ export function exportView(
   const d = { ...derived(c), ...visibleStats };
   const statisticsHidden = redacted.includes('statistics');
   const equipmentHidden = redacted.includes('equipment') || !!visibleStats;
+  const extra = c.category === 'extra';
   const view = {
+    extra,
+    categoryLabel: characterCategoryLabels[c.category],
     statisticsHidden,
     name: c.name,
     appearance: c.appearance,
     portraitId: c.portraitId,
     description: [
+      characterCategoryLabels[c.category],
       c.profession,
-      c.privacy.origin && !c.origin ? 'Pochodzenie ukryte' : c.origin,
+      redacted.includes('origin') ? 'Pochodzenie ukryte' : c.origin,
       c.caste,
       c.age ? `Wiek: ${c.age}` : '',
     ]
       .filter(Boolean)
       .join(' · '),
     ruleset: c.ruleset,
-    advancement: `${rankName(totalXp(c))} · ${totalXp(c)} PD · ${availableAdvances(c)} niewydanych rozwinięć`,
-    rank: rankName(totalXp(c)),
+    advancement: extra
+      ? 'Blotka · postać drugoplanowa'
+      : `${rankName(totalXp(c))} · ${totalXp(c)} PD · ${availableAdvances(c)} niewydanych rozwinięć`,
+    rank: extra ? '' : rankName(totalXp(c)),
     experience: totalXp(c),
     unspentAdvances: availableAdvances(c),
     traitGroups: Object.entries(attributes).map(([key, label]) => ({
@@ -42,6 +49,7 @@ export function exportView(
           .filter((id) => id.startsWith('knowledge:') && skillInfo(id)?.attribute === key)
           .map((id) => skillInfo(id)!),
       ]
+        .filter((skill) => !extra || !!d.build.skills[skill.id])
         .sort((a, b) => a.name.localeCompare(b.name, 'pl'))
         .map((s) => ({
           label: s.name,
@@ -60,7 +68,12 @@ export function exportView(
       },
       { label: 'Charyzma', value: String(d.charisma), note: '' },
     ],
-    session: { ...c.conditions, incapacitated: d.incapacitated, penalty: d.penalty },
+    session: {
+      ...c.conditions,
+      incapacitated: d.incapacitated,
+      penalty: d.penalty,
+      maxWounds: extra ? 1 : 3,
+    },
     stats: [
       ['Obrona', String(d.parry)],
       ['Wytrzymałość', `${d.totalToughness} (${d.toughness} + ${d.armor} pancerza)`],
@@ -77,7 +90,7 @@ export function exportView(
         skillInfo(key)?.name ?? key,
         `${formatDie(traitValue(d.build, key))}${d.skillModifiers[key] ? ` (${d.skillModifiers[key] > 0 ? '+' : ''}${d.skillModifiers[key]})` : ''}`,
       ]),
-    conditions: `Rany: ${c.conditions.wounds}/3 · Zmęczenie: ${c.conditions.fatigue}/3 · Szok: ${c.conditions.shaken ? 'tak' : 'nie'} · Fuksy: ${c.conditions.bennies}${d.incapacitated ? ' · WYELIMINOWANIE' : ''} · Kara za Rany i Zmęczenie: −${d.penalty}`,
+    conditions: `Rany: ${c.conditions.wounds}/${extra ? 1 : 3} · Zmęczenie: ${c.conditions.fatigue}/3 · Szok: ${c.conditions.shaken ? 'tak' : 'nie'} · Fuksy: ${extra ? 'pula MG' : c.conditions.bennies}${d.incapacitated ? ' · WYELIMINOWANIE' : ''} · Kara za Rany i Zmęczenie: −${d.penalty}`,
     edges: d.build.edges.map(
       (e) =>
         `${edges.find((v) => v.id === e.id)?.name}${e.target ? ` [${skillInfo(e.target)?.name || attributes[e.target as keyof typeof attributes] || c.inventory.find((i) => i.id === e.target)?.name || e.target}]` : ''}: ${edges.find((v) => v.id === e.id)?.summary}`,
@@ -129,8 +142,9 @@ export function exportView(
     xp: c.xp.map(
       (e) => `${e.amount >= 0 ? '+' : ''}${e.amount} PD · ${e.note} · ${e.date.slice(0, 10)}`,
     ),
-    background:
-      c.privacy.background && !c.background ? 'Historia ukryta — zapytaj w grze.' : c.background,
+    background: redacted.includes('background')
+      ? 'Historia ukryta — zapytaj w grze.'
+      : c.background,
     notes: c.notes,
     motivation: c.motivation,
     affiliation: c.affiliation,

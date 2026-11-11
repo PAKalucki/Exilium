@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Add Figura (Wild Card, default) and GM-only Blotka (Extra) categories to creation, sheets, exports and the main character filter. Existing sheets default to Figura without rewriting saved data.
+- Simplify Blotka creation with free stat and equipment assignment, editable active stats and no player budgets or XP advancement. Apply one-wound elimination, no individual Wild Die and no personal Fuksy.
+- Enable all four independent privacy settings by default for new Blotki, copies and drafts converted to Blotka, preserving the usual owner/GM visibility and explicit administrator reveal.
+
 ## 0.4.1
 
 - Make character archive/restore actions visible on character cards, in the sheet header and in Settings. Confirm archiving, preserve pending edits and restore the original draft/active state with existing edit/privacy permissions.

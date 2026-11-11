@@ -1,3 +1,4 @@
+import type { CharacterCategory } from './rules/model';
 export const roles = ['player', 'gm', 'admin'] as const;
 export type Role = (typeof roles)[number];
 export const roleLabels: Record<Role, string> = {
@@ -6,8 +7,12 @@ export const roleLabels: Record<Role, string> = {
   admin: 'Administrator',
 };
 export const managesGame = (user: { role: Role }) => user.role === 'admin' || user.role === 'gm';
-export const canEditCharacter = (user: { id: string; role: Role }, ownerId: string) =>
-  user.id === ownerId || managesGame(user);
+export const canCreateExtras = (user: { role: Role }) => user.role === 'gm';
+export const canEditCharacter = (
+  user: { id: string; role: Role },
+  ownerId: string,
+  category: CharacterCategory = 'wildCard',
+) => (user.id === ownerId || managesGame(user)) && (category !== 'extra' || managesGame(user));
 export const canViewPrivateCharacter = (
   user: { id: string; role: Role },
   ownerId: string,

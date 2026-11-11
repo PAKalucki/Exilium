@@ -68,7 +68,9 @@
             </div>{/each}
         </div>
         <div class="help-heading">
-          <span>Kość Figury: k6</span><HelpPopover help={playerHelp.dice} />
+          {#if v.extra}<span>Blotka · bez indywidualnej Kości Figury</span>{:else}<span
+              >Kość Figury: k6</span
+            ><HelpPopover help={playerHelp.dice} />{/if}
         </div>
       </section>
       <section class="panel">
@@ -182,7 +184,7 @@
         </div>{/each}
       {#if !c.inventory.length}<p class="muted">Brak przedmiotów.</p>{/if}{/if}
   </section>
-  {#if !v.statisticsHidden}<section class="panel">
+  {#if !v.statisticsHidden && !v.extra}<section class="panel">
       <div class="help-heading">
         <h3>Doświadczenie i rozwinięcia</h3>
         <HelpPopover help={playerHelp.advancement} />

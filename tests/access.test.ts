@@ -149,7 +149,9 @@ it('redacts private sections, preserves public combat stats, and requires admins
   expect(view.document.inventory).toEqual([]);
   expect(view.document.cash).toBe(0);
   expect(view.visibleStats?.totalToughness).toBe(derived(c).totalToughness);
-  expect(exportView(view.document, view.visibleStats).background).toContain('ukryta');
+  expect(exportView(view.document, view.visibleStats, view.redacted).background).toContain(
+    'ukryta',
+  );
   for (const actor of [a, gm])
     expect(characterForViewer(record, repo.identity.user(actor)).document).toEqual(c);
   expect(characterForViewer(record, repo.identity.user(admin))).toEqual(view);

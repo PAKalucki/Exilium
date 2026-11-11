@@ -9,7 +9,7 @@ import { config } from './config';
 import { DomainError } from './errors';
 import { EquipmentRepository } from './equipment';
 import { IdentityRepository, type User } from './identity';
-import { canEditCharacter } from '../access';
+import { canCreateExtras, canEditCharacter } from '../access';
 export type { User } from './identity';
 export { DomainError } from './errors';
 
@@ -90,6 +90,12 @@ export class Repository {
     this.db.prepare('DELETE FROM auth_sessions WHERE token_hash=?').run(tokenHash(token));
   }
   create(ownerId: string, name: string, document: Character = newCharacter(name)) {
+    document = characterSchema.parse(document);
+    if (document.category === 'extra') {
+      if (!canCreateExtras(this.identity.user(ownerId)))
+        throw new DomainError(403, 'Tylko MG tworzy Blotki.');
+      document = { ...document, privacy: newCharacter(name, 'extra').privacy };
+    }
     if (document.portraitId) this.portrait(ownerId, document.portraitId);
     const id = randomUUID(),
       date = new Date().toISOString();
@@ -162,7 +168,7 @@ export class Repository {
   editable(actorId: string, id: string): CharacterRecord {
     const user = this.identity.user(actorId),
       record = this.read(id);
-    if (!canEditCharacter(user, record.ownerId))
+    if (!canEditCharacter(user, record.ownerId, record.document.category))
       throw new DomainError(403, 'Tę kartę może edytować jej twórca, MG lub administrator.');
     return record;
   }

@@ -186,6 +186,12 @@ export function edgeIssues(
   return out;
 }
 export function validateCreation(c: Character): Issue[] {
+  if (c.category === 'extra')
+    return integrityIssues(c).map((message, index) => ({
+      code: `extra.integrity:${index}`,
+      message,
+      waived: false,
+    }));
   const out: Issue[] = [];
   const add = (code: string, message: string) => out.push(issue(c, code, message));
   const b = baseBuild(c),
@@ -245,6 +251,7 @@ export function validateCreation(c: Character): Issue[] {
 export function previewAdvance(c: Character, choice: AdvanceChoice) {
   const out: Issue[] = [];
   const add = (code: string, message: string) => out.push(issue(c, `advance.${code}`, message));
+  if (c.category === 'extra') add('extra', 'Statystyki Blotki ustala MG bez PD i rozwinięć.');
   const b = effectiveBuild(c),
     rank = rankIndex(totalXp(c));
   if (availableAdvances(c) <= 0) add('unavailable', 'Brak niewydanych rozwinięć.');
@@ -325,6 +332,17 @@ export function previewAdvance(c: Character, choice: AdvanceChoice) {
 }
 export function integrityIssues(c: Character): string[] {
   const errors: string[] = [];
+  if (
+    c.category === 'extra' &&
+    (c.legacy ||
+      c.xp.length ||
+      c.advances.length ||
+      c.conditions.bennies !== 0 ||
+      c.conditions.wounds > 1)
+  )
+    errors.push(
+      'Blotka ma najwyżej jedną Ranę, nie korzysta z osobistych fuksów ani rozwoju za PD.',
+    );
   if (totalXp(c) < 0) errors.push('PD nie mogą być ujemne.');
   if (availableAdvances(c) < 0)
     errors.push('Korekta PD pozostawiłaby więcej wydanych rozwinięć niż zdobytych.');
@@ -428,14 +446,16 @@ export function derived(c: Character) {
     Number(hind('habit')) +
     c.adjustments.charisma;
   const bennies =
-    3 +
-    (has('great-luck') ? 2 : Number(has('luck'))) +
-    Number(hind('young')) -
-    Number(hind('bad-luck'));
-  const woundPenalty = Math.max(
-    0,
-    c.conditions.wounds - (has('improved-nerves') ? 2 : Number(has('nerves'))),
-  );
+    c.category === 'extra'
+      ? 0
+      : 3 +
+        (has('great-luck') ? 2 : Number(has('luck'))) +
+        Number(hind('young')) -
+        Number(hind('bad-luck'));
+  const woundPenalty =
+    c.category === 'extra'
+      ? 0
+      : Math.max(0, c.conditions.wounds - (has('improved-nerves') ? 2 : Number(has('nerves'))));
   const fatiguePenalty = Math.min(2, c.conditions.fatigue);
   const skillModifiers: Record<string, number> = {};
   if (has('alertness')) skillModifiers.notice = 2;
@@ -469,7 +489,10 @@ export function derived(c: Character) {
     woundPenalty,
     fatiguePenalty,
     penalty: woundPenalty + fatiguePenalty,
-    incapacitated: c.conditions.incapacitated || c.conditions.fatigue === 3,
+    incapacitated:
+      c.conditions.incapacitated ||
+      c.conditions.fatigue === 3 ||
+      (c.category === 'extra' && c.conditions.wounds > 0),
     skillModifiers,
   };
 }

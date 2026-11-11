@@ -42,7 +42,7 @@ export function characterForViewer(
     c.credits = 0;
   }
   if (c.privacy.statistics) {
-    const empty = newCharacter();
+    const empty = newCharacter('Ukryte statystyki', c.category);
     c.build = empty.build;
     c.legacy = null;
     c.conditions = empty.conditions;
