@@ -42,6 +42,8 @@ Some source tables are less detailed than the full entry. The full entry takes p
 
 ## What is calculated
 
+The [combat tracker](combat.md) implements the 2015 card initiative, held actions, surprise, relevant initiative Edges and condition/damage tracking. Trait rolls and situational adjudication remain at the table; entered totals include modifiers. The supplied 2015 book uses Spirit success 4 to recover from Shaken and act normally.
+
 - Creation budgets, a free human Edge, Hindrance credit/spending, child budgets and the elder's Smarts-skill credit.
 - Prerequisites for the catalog's Edges, including rank, linked traits, another Edge and selected target.
 - Parry, torso Toughness/armor, Pace/running, Charisma, starting funds and session Fuksy.

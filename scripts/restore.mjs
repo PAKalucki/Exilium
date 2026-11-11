@@ -16,7 +16,7 @@ export function restore(input, destination) {
     const version = source
       .prepare('SELECT MAX(version) version FROM schema_migrations')
       .get().version;
-    if (![1, 2, 3, 4, 5].includes(version)) throw new Error('Unsupported database schema');
+    if (![1, 2, 3, 4, 5, 6].includes(version)) throw new Error('Unsupported database schema');
     source.prepare('SELECT count(*) FROM characters').get();
   } finally {
     source.close();

@@ -10,6 +10,7 @@ import { DomainError } from './errors';
 import { EquipmentRepository } from './equipment';
 import { IdentityRepository, type User } from './identity';
 import { canCreateExtras, canEditCharacter } from '../access';
+import { CombatRepository } from './combat';
 export type { User } from './identity';
 export { DomainError } from './errors';
 
@@ -20,6 +21,7 @@ export class Repository {
   readonly db: DatabaseSync;
   readonly equipment: EquipmentRepository;
   readonly identity: IdentityRepository;
+  readonly combat: CombatRepository;
   constructor(filename: string) {
     if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(filename);
@@ -56,6 +58,7 @@ export class Repository {
       .run(RULESET, 'SW PL 2015; Exilium; 400 dollars; current-rank advancement');
     this.equipment = new EquipmentRepository(this.db);
     this.identity = new IdentityRepository(this.db, config().adminDiscordId);
+    this.combat = new CombatRepository(this);
   }
   user(discordId: string, name: string): User {
     this.db
@@ -180,7 +183,8 @@ export class Repository {
     command: unknown,
     apply: (record: CharacterRecord) => void,
   ): CharacterRecord {
-    this.db.exec('BEGIN IMMEDIATE');
+    const nested = this.db.isTransaction;
+    this.db.exec(nested ? 'SAVEPOINT character_mutation' : 'BEGIN IMMEDIATE');
     try {
       const record = this.editable(ownerId, id),
         before = JSON.stringify(record.document),
@@ -192,7 +196,7 @@ export class Repository {
       if (existing) {
         if (existing.command_hash !== hash)
           throw new DomainError(409, 'Identyfikator działania został już użyty do innego żądania.');
-        this.db.exec('COMMIT');
+        this.db.exec(nested ? 'RELEASE character_mutation' : 'COMMIT');
         return record;
       }
       if (record.revision !== revision)
@@ -242,10 +246,12 @@ export class Repository {
           .prepare('INSERT INTO rule_exceptions VALUES(?,?,?,?)')
           .run(r.id, id, r.code, JSON.stringify(r)),
       );
-      this.db.exec('COMMIT');
+      this.db.exec(nested ? 'RELEASE character_mutation' : 'COMMIT');
       return this.editable(ownerId, id);
     } catch (e) {
-      this.db.exec('ROLLBACK');
+      this.db.exec(
+        nested ? 'ROLLBACK TO character_mutation; RELEASE character_mutation' : 'ROLLBACK',
+      );
       throw e;
     }
   }

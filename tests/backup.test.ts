@@ -54,6 +54,11 @@ describe('operational recovery', () => {
         item: { ...newItem(), name: 'Lutownica z warsztatu', price: 42 },
       });
       repo.equipment.change(user.id, catalogEntry.id, 1, crypto.randomUUID(), { type: 'archive' });
+      repo.db.prepare("UPDATE users SET role='gm' WHERE id=?").run(user.id);
+      const combat = repo.combat.create(user.id, {
+        name: 'Walka do odzyskania',
+        commandId: crypto.randomUUID(),
+      });
       await snapshot(join(dir, 'live.sqlite'), backup);
       expect(statSync(backup).mode & 0o777).toBe(0o600);
       expect(repo.session(token)).not.toBeNull();
@@ -66,6 +71,8 @@ describe('operational recovery', () => {
         expect(restoredCharacter.appearance).toContain('Blizna');
         expect(restored.portrait(user.id, restoredCharacter.portraitId!).width).toBe(96);
         expect(restored.session(token)).toBeNull();
+        expect(restored.combat.read(combat.id).document.name).toBe('Walka do odzyskania');
+        expect(restored.combat.view(combat.id, user.id).history).toHaveLength(1);
         expect(restored.identity.token(apiToken.token)).toBeNull();
         expect(restored.equipment.read(catalogEntry.id)).toMatchObject({
           status: 'archived',

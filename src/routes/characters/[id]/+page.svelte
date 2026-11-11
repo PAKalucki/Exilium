@@ -114,6 +114,7 @@
     privacy: 'Zmiana prywatności',
     saveDraft: 'Zapis szkicu',
     saveExtra: 'Zapis statystyk Blotki',
+    combat: 'Walka: zmiana stanów',
     finalize: 'Zatwierdzenie postaci',
     profile: 'Notatki i historia',
     tracker: 'Zmiana licznika',

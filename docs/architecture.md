@@ -18,4 +18,6 @@ A persistent shared catalog accepts Player proposals and GM/Admin review without
 
 Provide desktop/tablet editing with a live connection, A4 print/PDF, consistent snapshots, nonroot AMD64/ARM64 images and a package-derived version in the footer/health API. Keep actual origins, network policy, infrastructure code/state, deployment commands and live acceptance outside public application source.
 
-Offline editing, initiative/encounters, shared session logs, English localization and automated cybernetic mechanics are outside the current release. See [rules](rules.md), [roles/API](access-and-api.md), [catalog](compendium.md) and [validation](validation.md).
+The [combat tracker](combat.md) persists encounters and card-based initiative, shares a privacy-filtered view, and updates linked sheet conditions transactionally. GM/Admin manage turns; Players follow progress. The shuffled deck stays server-side.
+
+Offline editing, shared session logs, English localization and automated cybernetic mechanics are outside the current release. See [rules](rules.md), [roles/API](access-and-api.md), [catalog](compendium.md) and [validation](validation.md).

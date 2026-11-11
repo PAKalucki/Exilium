@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Add a shared combat panel with persistent encounters, existing character selection, NPC initiative groups, rounds and turn controls. MG/Admin manage combat; Players follow a privacy-filtered view.
+- Implement 2015 card initiative with two Jokers, suit tie-breaks, Quick/Level Headed, held actions, opposed interrupts and ties, surprise, and Tactician reserves including detached Extra allies.
+- Update linked character conditions transactionally, with revision checks and retry deduplication. Track damage/Soak, Shaken recovery, wounds, fatigue, personal/GM Fuksy and common defense/position markers.
+- Add audited encounter storage in migration 6 and preserve it through snapshots/restores. Keep shuffled deck order server-side and require explicit Admin reveal for private participants.
+
 ## 0.5.0
 
 - Add Figura (Wild Card, default) and GM-only Blotka (Extra) categories to creation, sheets, exports and the main character filter. Existing sheets default to Figura without rewriting saved data.

@@ -15,6 +15,7 @@ The local application includes:
 - A shared [equipment compendium](docs/compendium.md) with 117 initial entries; players submit additions and MG/Admin approve and maintain it without redeployment.
 - Custom Wiedza specializations can be renamed or removed during creation.
 - Wounds, fatigue, Shaken, Fuksy, ammunition/reloading, cash and electronic credits.
+- A shared [combat tracker](docs/combat.md): 2015 card initiative, NPC groups, held actions, surprise, Tactician cards, turns, linked conditions and damage/Soak tracking with privacy applied.
 - In-app XP awards/corrections, rank changes, advancement previews, attribute/skill/Edge increases and development history.
 - Player-recorded GM rulings and explicit numeric adjustments.
 - Landscape A4 character sheet inspired by the 2015 manual, with PDF saving through the browser print dialog and embedded Polish fonts.

@@ -17,11 +17,11 @@
     ></a
   >
   <nav aria-label="Główne">
-    <a href="/">Postacie</a>{#if data.user}<a href="/compendium">Kompendium</a><a href="/account"
-        >Moje konto</a
-      >{#if data.user.role === 'admin'}<a href="/users">Użytkownicy</a>{/if}{/if}<span
-      class="edition">SAVAGE WORLDS <b>2015</b></span
-    >
+    <a href="/">Postacie</a>{#if data.user}<a href="/combat">Walka</a><a href="/compendium"
+        >Kompendium</a
+      ><a href="/account">Moje konto</a>{#if data.user.role === 'admin'}<a href="/users"
+          >Użytkownicy</a
+        >{/if}{/if}<span class="edition">SAVAGE WORLDS <b>2015</b></span>
   </nav>
   <div class="account">
     {#if data.user}<span class="online-dot"></span><span>{data.user.name}</span>
@@ -31,7 +31,8 @@
   </div>
 </header>
 {#if data.user}<nav class="compact-navigation" aria-label="Sekcje aplikacji">
-    <a href="/">Postacie</a><a href="/compendium">Kompendium</a><a href="/account">Moje konto</a
+    <a href="/">Postacie</a><a href="/combat">Walka</a><a href="/compendium">Kompendium</a><a
+      href="/account">Moje konto</a
     >{#if data.user.role === 'admin'}<a href="/users">Użytkownicy</a>{/if}
   </nav>{/if}
 <main>{@render children()}</main>

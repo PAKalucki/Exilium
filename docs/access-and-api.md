@@ -18,6 +18,8 @@ The administrator uses `/users` to assign roles and enable/disable accounts afte
 
 ## Character categories
 
+The [combat panel](combat.md) is available under **Walka**. MG/Admin prepare encounters and manage initiative and linked sheet conditions; Players have a shared read-only view. Character privacy also applies there. Admin explicitly reveals private participants before managing them. Combat endpoints require a browser session and are outside the personal-token automation API.
+
 New and existing ordinary sheets are **Figura (Wild Card)**. Only the **MG** role can create **Blotka (Extra)** sheets, copy an Extra, or choose either category during initial creation. Administrator alone does not grant this capability. Category changes are restricted to drafts without XP, advances or a historical baseline; an active character's category stays fixed. The main list filters by all categories, Figury or Blotki, combined with creator and archive filters. Category remains public when statistics are private.
 
 Blotki use simplified creation without player point budgets, free-human-Edge requirements, rank/prerequisite checks or a starting-equipment allowance. Known mundane catalog choices and valid document structure are still required. The GM can edit their stats directly after activation using **Statystyki Blotki**; they do not use XP, advances or historical baselines. Admin can manage an Extra's profile, equipment, conditions, privacy and archive status after revealing private details, but cannot create or replace its build. A creator demoted to Player cannot edit an Extra.
