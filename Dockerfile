@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS build
+FROM --platform=$BUILDPLATFORM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS build
 WORKDIR /app
 COPY package.json package-lock.json vite.config.ts tsconfig.json ./
 COPY src/app.html ./src/app.html
@@ -8,14 +8,14 @@ COPY static ./static
 COPY scripts/origins.mjs ./scripts/origins.mjs
 RUN npm run check && npm run build && mkdir /app/runtime-data
 
-FROM --platform=$BUILDPLATFORM node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS dependencies
+FROM --platform=$BUILDPLATFORM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 # Runtime dependencies must remain architecture independent. Native SQLite is provided by Node.
 RUN node --input-type=module -e "import fs from 'node:fs'; const lock=JSON.parse(fs.readFileSync('package-lock.json')); for (const [key,p] of Object.entries(lock.packages)) { if(!p.dev && (p.cpu || p.os || p.libc)) throw new Error('Review target-specific runtime dependency: '+key); }"
 
-FROM node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS runtime
+FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS runtime
 WORKDIR /app
 # Apply available fixes for runtime OS packages; npm/corepack/yarn are build tools.
 # The running application and operational helpers invoke Node directly.
